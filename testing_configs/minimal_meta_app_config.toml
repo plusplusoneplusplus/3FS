@@ -1,0 +1,6 @@
+# Minimal Meta Server App Configuration
+# Contains app-specific configuration like node ID
+
+# Allow empty node_id for minimal setup
+allow_empty_node_id = true
+node_id = 0

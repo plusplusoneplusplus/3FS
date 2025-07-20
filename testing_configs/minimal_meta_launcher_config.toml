@@ -1,0 +1,34 @@
+# Minimal Meta Server Launcher Configuration
+# Contains launcher-specific configuration like cluster settings and connectivity
+
+cluster_id = "minimal_cluster"
+allow_dev_version = true
+
+# Network configuration - TCP only
+[ib_devices]
+# Allow TCP-only setup without RDMA devices
+allow_no_usable_devices = true
+allow_unknown_zone = true
+default_network_zone = 'UNKNOWN'
+default_pkey_index = 0
+default_roce_pkey_index = 0
+default_traffic_class = 0
+device_filter = []
+fork_safe = true
+prefer_ibdevice = true
+skip_inactive_ports = true
+skip_unusable_device = true
+subnets = []
+
+[client]
+default_timeout = '5s'
+force_use_tcp = true
+
+[client.io_worker]
+num_event_loop = 1
+tcp_connect_timeout = '5s'
+read_write_tcp_in_event_thread = false
+
+# Mgmtd client configuration (minimal)
+[mgmtd_client]
+mgmtd_server_addresses = [ 'TCP://127.0.0.1:7000' ]
