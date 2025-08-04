@@ -115,6 +115,7 @@ cleanup() {
     fi
     
     echo -e "${GREEN}All processes terminated.${NC}"
+    echo -e "${YELLOW}Service logs are available in: $BUILD_DIR/logs/${NC}"
     exit 0
 }
 
@@ -153,6 +154,9 @@ run_admin_cli() {
 }
 
 echo -e "${YELLOW}Starting services...${NC}"
+
+# Create logs directory
+mkdir -p "$BUILD_DIR/logs"
 
 # Update configuration files with dynamic IP address
 echo -e "${BLUE}Updating configuration files with IP: $HOST_IP${NC}"
@@ -239,10 +243,10 @@ cd "$BUILD_DIR"
 ./bin/mgmtd_main \
     --launcher_cfg "$CONFIG_DIR/mgmtd_main_launcher.toml" \
     --app-cfg "$CONFIG_DIR/mgmtd_main_app.toml" \
-    --cfg "$CONFIG_DIR/mgmtd_main.toml" &
+    --cfg "$CONFIG_DIR/mgmtd_main.toml" > "$BUILD_DIR/logs/mgmtd.log" 2>&1 &
 MGMTD_PID=$!
 PIDS+=($MGMTD_PID)
-echo "Started mgmtd with PID: $MGMTD_PID"
+echo "Started mgmtd with PID: $MGMTD_PID (logs: $BUILD_DIR/logs/mgmtd.log)"
 
 # Wait for mgmtd to be ready
 wait_for_service "mgmtd" 7000
@@ -253,10 +257,10 @@ cd "$BUILD_DIR"
 ./bin/meta_main \
     --launcher_cfg "$CONFIG_DIR/meta_main_launcher.toml" \
     --app_cfg "$CONFIG_DIR/meta_main_app.toml" \
-    --cfg "$CONFIG_DIR/meta_main.toml" &
+    --cfg "$CONFIG_DIR/meta_main.toml" > "$BUILD_DIR/logs/meta.log" 2>&1 &
 META_PID=$!
 PIDS+=($META_PID)
-echo "Started meta with PID: $META_PID"
+echo "Started meta with PID: $META_PID (logs: $BUILD_DIR/logs/meta.log)"
 
 # Wait for meta to be ready
 wait_for_service "meta" 8000
@@ -281,11 +285,11 @@ for ((i=1; i<=NUM_STORAGE_NODES; i++)); do
     ./bin/storage_main \
         --launcher_cfg "$CONFIG_DIR/storage_main_launcher_node$i.toml" \
         --app_cfg "$CONFIG_DIR/storage_main_app_node$i.toml" \
-        --cfg "$CONFIG_DIR/storage_main_node$i.toml" &
+        --cfg "$CONFIG_DIR/storage_main_node$i.toml" > "$BUILD_DIR/logs/storage_node$i.log" 2>&1 &
     STORAGE_PID=$!
     PIDS+=($STORAGE_PID)
     STORAGE_PIDS+=($STORAGE_PID)
-    echo "Started storage node $i with PID: $STORAGE_PID"
+    echo "Started storage node $i with PID: $STORAGE_PID (logs: $BUILD_DIR/logs/storage_node$i.log)"
 
     # Wait for storage to be ready
     wait_for_service "storage node $i" $serde_port
@@ -323,6 +327,11 @@ echo ""
 echo -e "${YELLOW}To interact with the cluster, use:${NC}"
 echo "  cd $BUILD_DIR"
 echo "  ./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"test\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"list-nodes\""
+echo ""
+echo -e "${YELLOW}To view service logs:${NC}"
+echo "  tail -f $BUILD_DIR/logs/mgmtd.log     # Management service logs"
+echo "  tail -f $BUILD_DIR/logs/meta.log      # Metadata service logs"
+echo "  tail -f $BUILD_DIR/logs/storage_node*.log  # Storage service logs"
 echo ""
 echo -e "${RED}Press Ctrl+C to stop all services and exit${NC}"
 
