@@ -3,8 +3,20 @@
 # 3FS Cluster Launch Script
 # This script starts mgmtd, meta, and storage services in the background
 # and registers the nodes. All processes are killed when the script is terminated.
+#
+# Usage: ./launch_cluster.sh [--dry-run]
+#   --dry-run: Generate config files but don't start services
+#
+# Environment variables:
+#   NUM_STORAGE_NODES: Number of storage nodes to create (default: 5)
 
 set -e
+
+# Parse command line arguments
+DRY_RUN=false
+if [[ "$1" == "--dry-run" ]]; then
+    DRY_RUN=true
+fi
 
 # Colors for output
 RED='\033[0;31m'
@@ -48,6 +60,12 @@ get_ip_address() {
     echo "127.0.0.1"
 }
 
+# Configuration
+NUM_STORAGE_NODES=${NUM_STORAGE_NODES:-5}  # Can be overridden by environment variable
+STORAGE_BASE_NODE_ID=10001
+STORAGE_BASE_SERDE_PORT=8001
+STORAGE_BASE_CORE_PORT=9001
+
 HOST_IP=$(get_ip_address)
 
 echo -e "${BLUE}3FS Cluster Launch Script${NC}"
@@ -66,6 +84,8 @@ fi
 
 # Array to store background process PIDs
 declare -a PIDS=()
+declare -a STORAGE_PIDS=()
+declare -a STORAGE_NODES=()
 
 # Function to cleanup all processes
 cleanup() {
@@ -147,7 +167,7 @@ update_config_files() {
             local temp_file="$temp_dir/$filename"
             
             # Replace hardcoded IP with dynamic IP
-            sed "s/172\.19\.70\.9/$HOST_IP/g" "$config_file" > "$temp_file"
+            sed "s/__HOST_IP__/$HOST_IP/g" "$config_file" > "$temp_file"
             echo "Updated $filename with IP $HOST_IP" >&2
         fi
     done
@@ -155,7 +175,63 @@ update_config_files() {
     echo "$temp_dir"
 }
 
+# Function to create storage node config files
+create_storage_config() {
+    local node_num="$1"
+    local node_id=$((STORAGE_BASE_NODE_ID + node_num - 1))
+    local serde_port=$((STORAGE_BASE_SERDE_PORT + node_num - 1))
+    local core_port=$((STORAGE_BASE_CORE_PORT + node_num - 1))
+    local storage_path="/tmp/3fs_storage_test_node$node_num"
+    
+    # Create storage-specific config files
+    local temp_dir="$BUILD_DIR/temp_configs"
+    
+    # App config
+    sed -e "s/__STORAGE_NODE_ID__/$node_id/g" \
+        "$temp_dir/storage_main_app.toml" > "$temp_dir/storage_main_app_node$node_num.toml"
+    
+    # Main config
+    sed -e "s/__STORAGE_SERDE_PORT__/$serde_port/g" \
+        -e "s/__STORAGE_CORE_PORT__/$core_port/g" \
+        -e "s|__STORAGE_PATH__|$storage_path|g" \
+        "$temp_dir/storage_main.toml" > "$temp_dir/storage_main_node$node_num.toml"
+    
+    # Launcher config (no changes needed, just copy)
+    cp "$temp_dir/storage_main_launcher.toml" "$temp_dir/storage_main_launcher_node$node_num.toml"
+    
+    echo "Created config files for storage node $node_num (ID: $node_id, Serde Port: $serde_port, Core Port: $core_port, Path: $storage_path)" >&2
+    
+    # Store node info for later use
+    STORAGE_NODES+=("$node_id:$serde_port:$core_port:$storage_path")
+}
+
 CONFIG_DIR=$(update_config_files)
+
+# Create storage node configurations
+echo -e "${BLUE}Creating storage node configurations...${NC}"
+for ((i=1; i<=NUM_STORAGE_NODES; i++)); do
+    create_storage_config $i
+done
+
+if [[ "$DRY_RUN" == "true" ]]; then
+    echo -e "${GREEN}✓ Dry run completed! Configuration files generated in: $CONFIG_DIR${NC}"
+    echo -e "${YELLOW}Storage nodes that would be created:${NC}"
+    for ((i=1; i<=NUM_STORAGE_NODES; i++)); do
+        node_info="${STORAGE_NODES[$((i-1))]}"
+        IFS=':' read -r node_id serde_port core_port storage_path <<< "$node_info"
+        echo "  - Storage node $i: ID=$node_id, Serde Port=$serde_port, Core Port=$core_port, Path=$storage_path"
+    done
+    echo ""
+    echo -e "${BLUE}Sample generated config file (storage_main_app_node1.toml):${NC}"
+    cat "$CONFIG_DIR/storage_main_app_node1.toml"
+    echo ""
+    echo -e "${BLUE}Sample generated config file (storage_main_node1.toml - excerpt):${NC}"
+    head -n 20 "$CONFIG_DIR/storage_main_node1.toml"
+    echo "..."
+    # Don't run cleanup in dry-run mode
+    trap - SIGINT SIGTERM EXIT
+    exit 0
+fi
 
 # 1. Start mgmtd
 echo -e "${BLUE}1. Starting mgmtd...${NC}"
@@ -190,24 +266,41 @@ echo -e "${BLUE}3. Registering meta node...${NC}"
 sleep 2  # Give meta a moment to fully initialize
 run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"test\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"register-node\" 100 META"
 
-# 4. Start storage
-echo -e "${BLUE}4. Starting storage...${NC}"
-cd "$BUILD_DIR"
-./bin/storage_main \
-    --launcher_cfg "$CONFIG_DIR/storage_main_launcher.toml" \
-    --app_cfg "$CONFIG_DIR/storage_main_app.toml" \
-    --cfg "$CONFIG_DIR/storage_main.toml" &
-STORAGE_PID=$!
-PIDS+=($STORAGE_PID)
-echo "Started storage with PID: $STORAGE_PID"
+# 4. Start storage nodes
+echo -e "${BLUE}4. Starting $NUM_STORAGE_NODES storage nodes...${NC}"
+for ((i=1; i<=NUM_STORAGE_NODES; i++)); do
+    node_info="${STORAGE_NODES[$((i-1))]}"
+    IFS=':' read -r node_id serde_port core_port storage_path <<< "$node_info"
+    
+    echo -e "${BLUE}4.$i. Starting storage node $i (ID: $node_id, Serde Port: $serde_port)...${NC}"
+    
+    # Create storage directory
+    mkdir -p "$storage_path"
+    
+    cd "$BUILD_DIR"
+    ./bin/storage_main \
+        --launcher_cfg "$CONFIG_DIR/storage_main_launcher_node$i.toml" \
+        --app_cfg "$CONFIG_DIR/storage_main_app_node$i.toml" \
+        --cfg "$CONFIG_DIR/storage_main_node$i.toml" &
+    STORAGE_PID=$!
+    PIDS+=($STORAGE_PID)
+    STORAGE_PIDS+=($STORAGE_PID)
+    echo "Started storage node $i with PID: $STORAGE_PID"
 
-# Wait for storage to be ready
-wait_for_service "storage" 8001
+    # Wait for storage to be ready
+    wait_for_service "storage node $i" $serde_port
+done
 
-# 5. Register storage node
-echo -e "${BLUE}5. Registering storage node...${NC}"
-sleep 2  # Give storage a moment to fully initialize
-run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"test\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"register-node\" 10001 STORAGE"
+# 5. Register storage nodes
+echo -e "${BLUE}5. Registering $NUM_STORAGE_NODES storage nodes...${NC}"
+for ((i=1; i<=NUM_STORAGE_NODES; i++)); do
+    node_info="${STORAGE_NODES[$((i-1))]}"
+    IFS=':' read -r node_id serde_port core_port storage_path <<< "$node_info"
+    
+    echo -e "${BLUE}5.$i. Registering storage node $i (ID: $node_id)...${NC}"
+    sleep 1  # Give storage a moment to fully initialize
+    run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"test\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"register-node\" $node_id STORAGE"
+done
 
 # 6. Verify cluster status
 echo -e "${BLUE}6. Checking cluster status...${NC}"
@@ -220,7 +313,12 @@ echo ""
 echo -e "${YELLOW}Cluster is running with the following processes:${NC}"
 echo "  - mgmtd (PID: $MGMTD_PID) - Management service on port 7000"
 echo "  - meta  (PID: $META_PID) - Metadata service on port 8000"
-echo "  - storage (PID: $STORAGE_PID) - Storage service on port 8001"
+for ((i=1; i<=NUM_STORAGE_NODES; i++)); do
+    node_info="${STORAGE_NODES[$((i-1))]}"
+    IFS=':' read -r node_id serde_port core_port storage_path <<< "$node_info"
+    storage_pid="${STORAGE_PIDS[$((i-1))]}"
+    echo "  - storage node $i (PID: $storage_pid) - Storage service on port $serde_port (ID: $node_id)"
+done
 echo ""
 echo -e "${YELLOW}To interact with the cluster, use:${NC}"
 echo "  cd $BUILD_DIR"

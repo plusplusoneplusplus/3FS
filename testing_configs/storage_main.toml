@@ -40,7 +40,7 @@ services = [ 'StorageSerde' ]
 use_independent_thread_pool = false
 
 [server.base.groups.listener]
-listen_port = 8001
+listen_port = __STORAGE_SERDE_PORT__
 listen_queue_depth = 1024
 reuse_port = false
 
@@ -61,7 +61,7 @@ services = [ 'Core' ]
 use_independent_thread_pool = true
 
 [server.base.groups.listener]
-listen_port = 9001
+listen_port = __STORAGE_CORE_PORT__
 listen_queue_depth = 1024
 reuse_port = false
 
@@ -86,11 +86,11 @@ allow_disk_without_uuid = true
 collect_all_fds = false
 create_engine_path = true
 target_num_per_path = 0
-target_paths = [ '/tmp/3fs_storage_test' ]
+target_paths = [ '__STORAGE_PATH__' ]
 
 [server.targets.storage_target]
 force_persist = false
-kv_path = '/tmp/3fs_storage_test/kv'
+kv_path = '__STORAGE_PATH__/kv'
 mutex_num = 257
 
 [server.targets.storage_target.kv_store]
@@ -122,5 +122,5 @@ auto_refresh_interval = '10s'
 enable_auto_extend_client_session = false
 enable_auto_heartbeat = true
 enable_auto_refresh = true
-mgmtd_server_addresses = [ 'TCP://172.19.70.9:7000' ]
+mgmtd_server_addresses = [ 'TCP://__HOST_IP__:7000' ]
 work_queue_size = 100

@@ -66,4 +66,4 @@ read_write_tcp_in_event_thread = false
 
 # Mgmtd client configuration (must be in server config to override launcher config)
 [server.mgmtd_client]
-mgmtd_server_addresses = [ 'TCP://172.19.70.9:7000' ]
+mgmtd_server_addresses = [ 'TCP://__HOST_IP__:7000' ]
