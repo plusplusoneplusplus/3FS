@@ -1,0 +1,2 @@
+  ./build/bin/mgmtd_main --launcher_cfg testing_configs/mgmtd_main_launcher.toml --app-cfg testing_configs/mgmtd_main_app.toml --cfg testing_configs/mgmtd_main.toml
+  ./build/bin/meta_main --launcher_cfg testing_configs/meta_main_launcher.toml --app_cfg testing_configs/meta_main_app.toml --cfg testing_configs/meta_main.toml

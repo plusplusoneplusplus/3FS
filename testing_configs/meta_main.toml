@@ -1,0 +1,49 @@
+# Minimal Meta Server Main Configuration
+# This configuration contains the main server settings (logging, server config, etc.)
+# Note: This should be used with meta_main_launcher.toml and meta_main_app.toml
+
+# Basic logging configuration
+[[common.log.categories]]
+categories = [ '.' ]
+handlers = [ 'console' ]
+inherit = true
+level = 'INFO'
+propagate = 'NONE'
+
+[[common.log.handlers]]
+async = false
+name = 'console'
+stream_type = 'STDERR'
+writer_type = 'STREAM'
+
+# Server configuration - minimal
+[server]
+use_memkv = true
+
+# Network configuration - minimal (required for server to listen)
+[server.base]
+groups_length = 1
+
+[[server.base.groups]]
+network_type = 'TCP'
+services = [ 'MetaSerde' ]
+use_independent_thread_pool = false
+
+[server.base.groups.listener]
+listen_port = 8000
+listen_queue_depth = 1024
+reuse_port = false
+
+[server.base.groups.processor]
+enable_coroutines_pool = true
+max_coroutines_num = 64
+max_processing_requests_num = 1024
+
+[server.base.groups.io_worker]
+num_event_loop = 1
+tcp_connect_timeout = '5s'
+read_write_tcp_in_event_thread = false
+
+# Mgmtd client configuration (must be in server config to override launcher config)
+[server.mgmtd_client]
+mgmtd_server_addresses = [ 'TCP://172.19.70.9:7000' ]

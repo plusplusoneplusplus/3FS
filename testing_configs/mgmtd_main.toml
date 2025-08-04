@@ -1,0 +1,35 @@
+[[common.log.categories]]
+categories = [ '.' ]
+handlers = [ 'console' ]
+level = 'INFO'
+
+[[common.log.handlers]]
+name = 'console'
+writer_type = 'STREAM'
+stream_type = 'STDERR'
+start_level = 'NONE'
+
+[server.base.thread_pool]
+num_bg_threads = 1
+num_connect_threads = 1
+num_io_threads = 1
+num_proc_threads = 1
+
+[[server.base.groups]]
+network_type = 'TCP'
+services = [ 'Mgmtd' ]
+
+[server.base.groups.io_worker]
+num_event_loop = 1
+
+[server.base.groups.listener]
+listen_port = 7000
+
+[server.base.groups.processor]
+enable_coroutines_pool = true
+max_coroutines_num = 64
+
+[server.service]
+send_heartbeat = false
+target_info_load_interval = '5s'
+update_chains_interval = '5s'

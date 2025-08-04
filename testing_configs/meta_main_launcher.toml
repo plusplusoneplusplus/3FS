@@ -1,7 +1,7 @@
 # Minimal Meta Server Launcher Configuration
 # Contains launcher-specific configuration like cluster settings and connectivity
 
-cluster_id = "minimal_cluster"
+cluster_id = "test"
 allow_dev_version = true
 
 # Network configuration - TCP only
@@ -31,4 +31,4 @@ read_write_tcp_in_event_thread = false
 
 # Mgmtd client configuration (minimal)
 [mgmtd_client]
-mgmtd_server_addresses = [ 'TCP://127.0.0.1:7000' ]
+mgmtd_server_addresses = [ 'TCP://172.19.70.9:7000' ]

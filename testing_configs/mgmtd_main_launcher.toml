@@ -1,0 +1,11 @@
+allow_dev_version = true
+cluster_id = 'test'
+use_memkv = true
+
+[ib_devices]
+allow_no_usable_devices = true
+allow_unknown_zone = true
+default_network_zone = 'TCP'
+
+[kv_engine]
+use_memkv = true

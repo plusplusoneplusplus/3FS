@@ -231,6 +231,9 @@ Result<std::vector<IBDevice::Ptr>> IBDevice::openAll(const IBConfig &config) {
   SCOPE_EXIT { ibv_free_device_list(deviceList); };
   if (deviceCnt <= 0) {
     XLOGF(WARN, "No RDMA devices!!!");
+    if (config.allow_no_usable_devices()) {
+      return std::vector<IBDevice::Ptr>();
+    }
     return makeError(RPCCode::kIBInitFailed, "No usable RDMA devices.");
   }
 
