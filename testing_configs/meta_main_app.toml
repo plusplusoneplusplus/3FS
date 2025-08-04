@@ -3,4 +3,4 @@
 
 # Allow empty node_id for minimal setup
 allow_empty_node_id = true
-node_id = 1
+node_id = 100
