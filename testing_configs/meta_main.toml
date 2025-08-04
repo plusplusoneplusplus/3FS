@@ -22,7 +22,6 @@ use_memkv = true
 
 # Network configuration - minimal (required for server to listen)
 [server.base]
-groups_length = 1
 
 [[server.base.groups]]
 network_type = 'TCP'
@@ -31,6 +30,27 @@ use_independent_thread_pool = false
 
 [server.base.groups.listener]
 listen_port = 8000
+listen_queue_depth = 1024
+reuse_port = false
+
+[server.base.groups.processor]
+enable_coroutines_pool = true
+max_coroutines_num = 64
+max_processing_requests_num = 1024
+
+[server.base.groups.io_worker]
+num_event_loop = 1
+tcp_connect_timeout = '5s'
+read_write_tcp_in_event_thread = false
+
+# Second group for Core service as expected by default config
+[[server.base.groups]]
+network_type = 'TCP'
+services = [ 'Core' ]
+use_independent_thread_pool = true
+
+[server.base.groups.listener]
+listen_port = 9000
 listen_queue_depth = 1024
 reuse_port = false
 

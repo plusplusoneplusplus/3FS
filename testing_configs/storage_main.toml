@@ -1,0 +1,126 @@
+# Minimal Storage Server Main Configuration
+# This configuration contains the main server settings (logging, server config, etc.)
+# Note: This should be used with storage_main_launcher.toml and storage_main_app.toml
+
+# Basic logging configuration
+[[common.log.categories]]
+categories = [ '.' ]
+handlers = [ 'console' ]
+inherit = true
+level = 'INFO'
+propagate = 'NONE'
+
+[[common.log.handlers]]
+async = false
+name = 'console'
+stream_type = 'STDERR'
+writer_type = 'STREAM'
+
+# Server configuration - minimal
+[server]
+use_coroutines_pool_read = true
+use_coroutines_pool_update = true
+
+# Simplified thread pool configuration
+[server.base.thread_pool]
+bg_thread_pool_stratetry = 'SHARED_QUEUE'
+collect_stats = false
+enable_work_stealing = false
+io_thread_pool_stratetry = 'SHARED_QUEUE'
+num_bg_threads = 2
+num_connect_threads = 2
+num_io_threads = 4
+num_proc_threads = 4
+proc_thread_pool_stratetry = 'SHARED_QUEUE'
+
+# Network configuration - StorageSerde service using TCP
+[[server.base.groups]]
+network_type = 'TCP'
+services = [ 'StorageSerde' ]
+use_independent_thread_pool = false
+
+[server.base.groups.listener]
+listen_port = 8001
+listen_queue_depth = 1024
+reuse_port = false
+
+[server.base.groups.processor]
+enable_coroutines_pool = true
+max_coroutines_num = 64
+max_processing_requests_num = 1024
+
+[server.base.groups.io_worker]
+num_event_loop = 1
+tcp_connect_timeout = '5s'
+read_write_tcp_in_event_thread = false
+
+# Core service group
+[[server.base.groups]]
+network_type = 'TCP'
+services = [ 'Core' ]
+use_independent_thread_pool = true
+
+[server.base.groups.listener]
+listen_port = 9001
+listen_queue_depth = 1024
+reuse_port = false
+
+[server.base.groups.processor]
+enable_coroutines_pool = true
+max_coroutines_num = 64
+max_processing_requests_num = 1024
+
+[server.base.groups.io_worker]
+num_event_loop = 1
+tcp_connect_timeout = '5s'
+read_write_tcp_in_event_thread = false
+
+# Minimal storage-specific configuration
+[server.storage]
+read_only = false
+max_num_results_per_query = 100
+
+# Basic target configuration for local testing
+[server.targets]
+allow_disk_without_uuid = true
+collect_all_fds = false
+create_engine_path = true
+target_num_per_path = 0
+target_paths = [ '/tmp/3fs_storage_test' ]
+
+[server.targets.storage_target]
+force_persist = false
+kv_path = '/tmp/3fs_storage_test/kv'
+mutex_num = 257
+
+[server.targets.storage_target.kv_store]
+create_if_missing = true
+type = 'LevelDB'
+leveldb_block_cache_size = '128MB'
+leveldb_write_buffer_size = '16MB'
+sync_when_write = false
+
+[server.targets.storage_target.meta_store]
+allocate_size = '64MB'
+
+# AIO Read Worker configuration - disable io_uring for testing
+[server.aio_read_worker]
+enable_io_uring = false
+ioengine = 'libaio'
+max_events = 256
+min_complete = 64
+num_threads = 4
+queue_size = 1024
+wait_all_inflight = false
+
+# Mgmtd client configuration (must be in server config to override launcher config)
+[server.mgmtd]
+accept_incomplete_routing_info_during_mgmtd_bootstrapping = true
+auto_extend_client_session_interval = '10s'
+auto_heartbeat_interval = '10s'
+auto_refresh_interval = '10s'
+enable_auto_extend_client_session = false
+enable_auto_heartbeat = true
+enable_auto_refresh = true
+mgmtd_server_addresses = [ 'TCP://172.19.70.9:7000' ]
+work_queue_size = 100

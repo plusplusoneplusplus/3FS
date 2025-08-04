@@ -1,0 +1,6 @@
+# Minimal Storage Server App Configuration
+# This configuration contains the app-specific settings
+# Note: This should be used with storage_main.toml and storage_main_launcher.toml
+
+allow_empty_node_id = true
+node_id = 10001

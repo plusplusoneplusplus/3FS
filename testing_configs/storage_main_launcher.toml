@@ -1,0 +1,57 @@
+# Minimal Storage Server Launcher Configuration
+# This configuration contains the launcher-specific settings
+# Note: This should be used with storage_main.toml and storage_main_app.toml
+
+allow_dev_version = true
+cluster_id = 'test'
+
+[client]
+default_compression_level = 0
+default_compression_threshold = '128KB'
+default_log_long_running_threshold = '0ns'
+default_report_metrics = false
+default_send_retry_times = 1
+default_timeout = '1s'
+enable_rdma_control = false
+force_use_tcp = true
+
+[client.io_worker]
+num_event_loop = 1
+tcp_connect_timeout = '5s'
+read_write_tcp_in_event_thread = false
+
+[client.io_worker.connect_concurrency_limiter]
+max_concurrency = 4
+
+[client.io_worker.transport_pool]
+max_connections = 1
+
+[client.processor]
+enable_coroutines_pool = true
+max_coroutines_num = 64
+max_processing_requests_num = 1024
+
+[client.thread_pool]
+bg_thread_pool_stratetry = 'SHARED_QUEUE'
+collect_stats = false
+enable_work_stealing = false
+io_thread_pool_stratetry = 'SHARED_QUEUE'
+num_bg_threads = 2
+num_connect_threads = 2
+num_io_threads = 2
+num_proc_threads = 2
+proc_thread_pool_stratetry = 'SHARED_QUEUE'
+
+[ib_devices]
+allow_no_usable_devices = true
+
+[mgmtd_client]
+accept_incomplete_routing_info_during_mgmtd_bootstrapping = true
+auto_extend_client_session_interval = '10s'
+auto_heartbeat_interval = '10s'
+auto_refresh_interval = '10s'
+enable_auto_extend_client_session = false
+enable_auto_heartbeat = true
+enable_auto_refresh = true
+mgmtd_server_addresses = [ 'TCP://172.19.70.9:7000' ]
+work_queue_size = 100
