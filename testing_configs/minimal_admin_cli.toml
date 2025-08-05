@@ -3,7 +3,7 @@
 # to a management server and execute commands in a testing environment.
 
 # Basic settings
-cluster_id = "test"
+cluster_id = "stage"
 log = "INFO"
 
 # Client configuration - force TCP usage

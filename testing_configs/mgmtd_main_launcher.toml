@@ -1,5 +1,5 @@
 allow_dev_version = true
-cluster_id = 'test'
+cluster_id = 'stage'
 use_memkv = true
 
 [ib_devices]

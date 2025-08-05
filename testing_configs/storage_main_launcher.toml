@@ -3,7 +3,7 @@
 # Note: This should be used with storage_main.toml and storage_main_app.toml
 
 allow_dev_version = true
-cluster_id = 'test'
+cluster_id = 'stage'
 
 [client]
 default_compression_level = 0

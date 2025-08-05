@@ -268,7 +268,7 @@ wait_for_service "meta" 8000
 # 3. Register meta node
 echo -e "${BLUE}3. Registering meta node...${NC}"
 sleep 2  # Give meta a moment to fully initialize
-run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"test\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"register-node\" 100 META"
+run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"stage\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"register-node\" 100 META"
 
 # 4. Start storage nodes
 echo -e "${BLUE}4. Starting $NUM_STORAGE_NODES storage nodes...${NC}"
@@ -303,18 +303,18 @@ for ((i=1; i<=NUM_STORAGE_NODES; i++)); do
     
     echo -e "${BLUE}5.$i. Registering storage node $i (ID: $node_id)...${NC}"
     sleep 1  # Give storage a moment to fully initialize
-    run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"test\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"register-node\" $node_id STORAGE"
+    run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"stage\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"register-node\" $node_id STORAGE"
 done
 
 # 6. Verify cluster status
 echo -e "${BLUE}6. Checking cluster status...${NC}"
 sleep 1
-run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"test\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"list-nodes\""
+run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"stage\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"list-nodes\""
 
 # 7. Create root user
 # echo -e "${BLUE}7. Creating root user...${NC}"
 # sleep 1
-# run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"test\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"user-add --root --admin 0 root\""
+# run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"stage\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"user-add --root --admin 0 root\""
 
 echo ""
 echo -e "${GREEN}✓ All services started successfully!${NC}"
@@ -331,7 +331,7 @@ done
 echo ""
 echo -e "${YELLOW}To interact with the cluster, use:${NC}"
 echo "  cd $BUILD_DIR"
-echo "  ./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"test\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"list-nodes\""
+echo "  ./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"stage\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"list-nodes\""
 echo ""
 echo -e "${YELLOW}To view service logs:${NC}"
 echo "  tail -f $BUILD_DIR/logs/mgmtd.log     # Management service logs"
