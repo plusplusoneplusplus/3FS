@@ -1,0 +1,19 @@
+# Minimal Admin CLI Configuration
+# This configuration contains the minimal settings needed for admin_cli to connect
+# to a management server and execute commands in a testing environment.
+
+# Basic settings
+cluster_id = "test"
+log = "INFO"
+
+# Client configuration - force TCP usage
+[client]
+force_use_tcp = true
+
+# IB devices configuration - allow TCP-only setup
+[ib_devices]
+allow_no_usable_devices = true
+
+# Management client configuration - server addresses
+[mgmtd_client]
+mgmtd_server_addresses = ["TCP://172.19.70.9:7000"]

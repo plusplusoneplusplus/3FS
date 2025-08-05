@@ -312,9 +312,9 @@ sleep 1
 run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"test\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"list-nodes\""
 
 # 7. Create root user
-echo -e "${BLUE}7. Creating root user...${NC}"
-sleep 1
-run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"test\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"user-add --root --admin 0 root\""
+# echo -e "${BLUE}7. Creating root user...${NC}"
+# sleep 1
+# run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"test\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"user-add --root --admin 0 root\""
 
 echo ""
 echo -e "${GREEN}✓ All services started successfully!${NC}"
