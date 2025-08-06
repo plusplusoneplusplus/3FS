@@ -44,7 +44,7 @@ echo "Using output directory: ${OUTPUT_DIR}"
 echo "Running chain table generation..."
 python3 "${PROJECT_ROOT}/deploy/data_placement/src/setup/gen_chain_table.py" \
    --chain_table_type CR --node_id_begin 10001 --node_id_end 10005 \
-   --num_disks_per_node 16 --num_targets_per_disk 6 \
+   --num_disks_per_node 1 --num_targets_per_disk 6 \
    --target_id_prefix 1 --chain_id_prefix 9 \
    --incidence_matrix_path "${OUTPUT_DIR}/incidence_matrix.pickle"
 

@@ -842,7 +842,7 @@ CoTryTask<Rsp> StorageClientImpl::callMessengerMethod(StorageMessenger &messenge
 
   for (const auto &serviceGroup : nodeInfo.app.serviceGroups) {
     for (const auto &address : serviceGroup.endpoints) {
-      if (address.type == net::Address::Type::RDMA) {
+      if (address.type == net::Address::Type::RDMA || address.type == net::Address::Type::TCP) {
         serde::Timestamp timestamp;
         auto response =
             FAULT_INJECTION_POINT(requestCtx.debugFlags.injectClientError(),
@@ -881,8 +881,8 @@ CoTryTask<Rsp> StorageClientImpl::callMessengerMethod(StorageMessenger &messenge
     }
   }
 
-  // No RDMA interface is found for the target node
-  XLOGF(DBG1, "No RDMA interface found on node: {:?}", nodeInfo);
+  // No supported interface (RDMA or TCP) found for the target node
+  XLOGF(DBG1, "No supported interface (RDMA or TCP) found on node: {:?}", nodeInfo);
   co_return makeError(StorageClientCode::kNoRDMAInterface);
 }
 
