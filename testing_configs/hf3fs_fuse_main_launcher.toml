@@ -95,5 +95,5 @@ auto_refresh_interval = '10s'
 enable_auto_extend_client_session = true
 enable_auto_heartbeat = false
 enable_auto_refresh = true
-mgmtd_server_addresses = [ 'TCP://__HOST_IP__:7000' ]
+mgmtd_server_addresses = [ 'TCP://172.19.70.9:7000' ]
 work_queue_size = 100

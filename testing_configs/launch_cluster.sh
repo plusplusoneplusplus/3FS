@@ -314,7 +314,26 @@ run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp
 # 7. Create root user
 # echo -e "${BLUE}7. Creating root user...${NC}"
 # sleep 1
-# run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id \"stage\" --config.mgmtd_client.mgmtd_server_addresses '[\"TCP://${HOST_IP}:7000\"]' \"user-add --root --admin 0 root\""
+# run_admin_cli "./bin/admin_cli --config.log 'INFO' --config.client.force_use_tcp true --config.ib_devices.allow_no_usable_devices true --config.cluster_id "stage" --config.mgmtd_client.mgmtd_server_addresses '["TCP://${HOST_IP}:7000"]' "user-add --root --admin 0 root""
+
+# 8. Run config chain
+echo -e "${BLUE}8. Running config chain setup...${NC}"
+sleep 1
+if [[ -x "$SCRIPT_DIR/config_chain.sh" ]]; then
+    echo "Executing config_chain.sh..."
+    cd "$PROJECT_ROOT"  # Change to project root directory where the relative paths are correct
+    "$SCRIPT_DIR/config_chain.sh"
+    cd "$BUILD_DIR"
+else
+    echo -e "${YELLOW}Warning: config_chain.sh not found or not executable at $SCRIPT_DIR/config_chain.sh${NC}"
+fi
+
+# 9. Update fuse config
+echo -e "${BLUE}9. Updating FUSE configuration...${NC}"
+sleep 1
+run_admin_cli "./bin/admin_cli --cfg $SCRIPT_DIR/minimal_admin_cli.toml \"set-config --type FUSE --file $SCRIPT_DIR/hf3fs_fuse_main.toml\""
+
+echo ""
 
 echo ""
 echo -e "${GREEN}✓ All services started successfully!${NC}"
