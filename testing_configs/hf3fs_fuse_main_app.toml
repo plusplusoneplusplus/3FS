@@ -1,0 +1,4 @@
+# Minimal FUSE Client App Configuration
+# This configuration is kept minimal for testing purposes
+# All application-specific settings can be added here if needed
+# Note: This should be used with hf3fs_fuse_main_launcher.toml and hf3fs_fuse_main.toml
