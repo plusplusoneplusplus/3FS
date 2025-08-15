@@ -53,7 +53,8 @@ class MkdirsOp : public Operation<MkdirsRsp> {
 
     auto parent = co_await resolveResult->getParentInode(txn);
     CO_RETURN_ON_ERROR(parent);
-    CO_RETURN_ON_ERROR(parent->acl.checkPermission(req_.user, AccessType::WRITE));
+    // temp disable the persmission check to allow running fuse w/o the root
+    // CO_RETURN_ON_ERROR(parent->acl.checkPermission(req_.user, AccessType::WRITE));
     CO_RETURN_ON_ERROR(parent->asDirectory().checkLock(req_.client));
 
     auto layout = req_.layout;

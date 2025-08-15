@@ -213,6 +213,34 @@
                 "programOutput": true,
                 "exceptions": true
             }
+        },
+        {
+            "name": "Attach to storage_main",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "${workspaceFolder}/build/bin/storage_main",
+            "processId": "${command:pickProcess}",
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ],
+            "logging": {
+                "moduleLoad": false,
+                "trace": false,
+                "engineLogging": false,
+                "programOutput": true,
+                "exceptions": true
+            }
         }
     ],
     "inputs": [

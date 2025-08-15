@@ -196,8 +196,8 @@ check_overlapping_write_buffers = false
 chunk_checksum_type = 'CRC32C'
 create_net_client_for_updates = false
 implementation_type = 'RPC'
-max_inline_read_bytes = '0'
-max_inline_write_bytes = '0'
+max_inline_read_bytes = '1MB'
+max_inline_write_bytes = '1MB'
 max_read_io_bytes = '0'
 
 [storage.net_client]
