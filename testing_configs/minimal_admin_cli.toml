@@ -13,7 +13,13 @@ force_use_tcp = true
 # IB devices configuration - allow TCP-only setup
 [ib_devices]
 allow_no_usable_devices = true
+allow_unknown_zone = true
+default_network_zone = 'UNKNOWN'
 
 # Management client configuration - server addresses
 [mgmtd_client]
 mgmtd_server_addresses = ["TCP://172.19.70.9:7000"]
+
+# Meta client configuration - force TCP
+[meta_client]
+network_type = "TCP"
