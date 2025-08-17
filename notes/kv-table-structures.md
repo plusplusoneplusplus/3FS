@@ -297,6 +297,54 @@ Sessions are cleaned up through:
 2. **Session Timeout**: Background cleanup of stale INOS entries
 3. **Client Disconnect**: Cleanup based on client heartbeat failure
 
+## File Chunk Storage Architecture
+
+### Chunk Structure Design
+
+Files in 3FS are **not stored as single chunks** but are divided into multiple fixed-size chunks. Importantly, **chunk lists are not explicitly stored in the metadata**. Instead, 3FS uses a calculated approach for chunk management.
+
+### How Chunks Are Determined
+
+#### 1. Layout-Based Calculation
+Each file's inode contains a `Layout` structure with:
+- **chunkSize**: Size of each chunk (e.g., 4MB)
+- **stripeSize**: Number of chunks per stripe  
+- **Chain assignment strategy**: Empty, ChainRange, or ChainList
+
+#### 2. Chunk ID Generation
+Chunks are identified using a calculated approach:
+```cpp
+// Calculate chunk number from file offset
+auto chunk = offset / layout.chunkSize;
+
+// ChunkId format: [inode_id] + [track_id] + [chunk_number]  
+ChunkId(InodeId inode, uint16_t track, uint32_t chunk)
+```
+
+#### 3. Storage Chain Assignment
+- **ChainRange**: Chunks assigned to storage chains using deterministic algorithm based on chunk number
+- **ChainList**: Specific chains pre-assigned for the file
+- **getChainOfChunk()**: Method calculates which storage chain a specific chunk belongs to
+
+### Benefits of Calculated Chunks
+
+- **No metadata overhead**: No need to store chunk lists in KV tables
+- **Infinite scalability**: Files can grow without updating chunk metadata
+- **Deterministic access**: Any chunk can be located without metadata lookups (O(1) operations)
+- **Efficient operations**: Chunk operations are calculations, not list traversals
+- **Storage efficiency**: Very large files don't require proportionally large metadata
+
+### Chunk Access Pattern
+
+When accessing file data:
+1. **Path Resolution**: DENT lookups to get inode ID
+2. **Inode Loading**: INOD lookup to get file layout
+3. **Chunk Calculation**: Compute chunk number from offset and layout
+4. **Chain Resolution**: CHIT/CHIF lookups to determine storage targets
+5. **Direct Storage Access**: Contact storage nodes for chunk data
+
+This design allows 3FS to handle petabyte-scale files efficiently since chunk locations are computed rather than stored.
+
 ## Key Design Characteristics
 
 - **Hierarchical Keys**: Directory structure maps naturally to key hierarchy
