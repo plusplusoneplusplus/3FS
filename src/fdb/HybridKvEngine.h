@@ -9,10 +9,12 @@ class FDBContext;
 
 namespace hf3fs::kv {
 struct HybridKvEngineConfig;
+struct CustomKvEngineConfig;
 class HybridKvEngine : public kv::IKVEngine {
  public:
   static std::shared_ptr<HybridKvEngine> fromMem();
   static std::shared_ptr<HybridKvEngine> fromFdb(const kv::fdb::FDBConfig &config);
+  static std::shared_ptr<HybridKvEngine> fromCustom(const CustomKvEngineConfig &config);
   static std::shared_ptr<HybridKvEngine> from(bool useMemKV, const kv::fdb::FDBConfig &config);
   static std::shared_ptr<HybridKvEngine> from(const HybridKvEngineConfig &config);
 

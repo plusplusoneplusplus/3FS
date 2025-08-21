@@ -5,6 +5,7 @@
 #include "FDBContext.h"
 #include "FDBKVEngine.h"
 #include "HybridKvEngineConfig.h"
+#include "CustomKvEngine.h"
 #include "common/kv/mem/MemKVEngine.h"
 
 namespace hf3fs::kv {
@@ -32,8 +33,21 @@ std::shared_ptr<HybridKvEngine> HybridKvEngine::from(bool useMemKV, const kv::fd
   return fromFdb(config);
 }
 
+std::shared_ptr<HybridKvEngine> HybridKvEngine::fromCustom(const CustomKvEngineConfig &config) {
+  std::shared_ptr<HybridKvEngine> p(new HybridKvEngine);
+  p->kvEngines_.push_back(std::make_unique<CustomKvEngine>(config));
+  return p;
+}
+
 std::shared_ptr<HybridKvEngine> HybridKvEngine::from(const HybridKvEngineConfig &config) {
-  return from(config.use_memkv(), config.fdb());
+  const auto& engine_type = config.kv_engine_type();
+  if (engine_type == "custom") {
+    return fromCustom(config.custom_kv());
+  } else if (engine_type == "memkv" || config.use_memkv()) {
+    return fromMem();
+  } else {
+    return fromFdb(config.fdb());
+  }
 }
 
 std::shared_ptr<HybridKvEngine> HybridKvEngine::from(const HybridKvEngineConfig &config,

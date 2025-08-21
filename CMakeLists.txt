@@ -138,6 +138,39 @@ TARGET_INCLUDE_DIRECTORIES(clickhouse-cpp-lib
 TARGET_INCLUDE_DIRECTORIES(clickhouse-cpp-lib-static
     PUBLIC ${PROJECT_SOURCE_DIR}/third_party/clickhouse-cpp
 )
+
+# Add kv client library
+add_subdirectory("third_party/kv" EXCLUDE_FROM_ALL)
+
+# Build the Rust KV client
+add_custom_target(kv_client_rust
+    COMMAND cargo build --release
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/rust/client
+    COMMENT "Building Rust KV client library"
+)
+
+# Copy the kv client dynamic library for tests
+# This ensures tests can find the library at runtime
+add_custom_target(copy_kv_library ALL
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/rust/client/target/$<IF:$<CONFIG:Debug>,debug,release>
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/kv/rust/client/target/$<IF:$<CONFIG:Debug>,debug,release>/libkvstore_client.rlib
+        ${CMAKE_BINARY_DIR}/rust/client/target/$<IF:$<CONFIG:Debug>,debug,release>/libkvstore_client.rlib
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}/tests
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/kv/rust/client/target/$<IF:$<CONFIG:Debug>,debug,release>/libkvstore_client.rlib
+        ${CMAKE_BINARY_DIR}/tests/libkvstore_client.rlib
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/kv/rust/client/target/$<IF:$<CONFIG:Debug>,debug,release>/libkvstore_client.so
+        ${CMAKE_BINARY_DIR}/tests/libkvstore_client.so
+    COMMAND ${CMAKE_COMMAND} -E make_directory ${CMAKE_BINARY_DIR}
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party/kv/rust/client/target/$<IF:$<CONFIG:Debug>,debug,release>/libkvstore_client.rlib
+        ${CMAKE_BINARY_DIR}/libkvstore_client.rlib
+    COMMENT "Copying kv client library to build directory and tests directory for runtime access"
+    DEPENDS kv_client_rust
+)
+
 TARGET_INCLUDE_DIRECTORIES (absl-lib
     PUBLIC ${PROJECT_SOURCE_DIR}/third_party/clickhouse-cpp/contrib
 )
