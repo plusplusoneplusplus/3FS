@@ -20,6 +20,19 @@ writer_type = 'STREAM'
 [server]
 use_memkv = true
 
+[server.kv_engine]
+kv_engine_type = "custom"
+use_memkv = false
+
+[server.kv_engine.custom_kv]
+cluster_endpoints = ["__HOST_IP__:9090"]
+transaction_timeout_ms = 10000
+max_retry_count = 10
+connection_pool_size = 10
+connection_timeout_ms = 5000
+read_timeout_ms = 30000
+write_timeout_ms = 30000
+
 # Network configuration - minimal (required for server to listen)
 [server.base]
 
