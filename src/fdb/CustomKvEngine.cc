@@ -47,9 +47,9 @@ class CustomKvEngineImpl {
     }
 
     try {
-      // Create a new readonly transaction with the Rust client
+      // Create a new transaction with the Rust client (CustomTransaction can handle both read-only and read-write operations)
       auto transaction_id = generateTransactionId();
-      return std::make_unique<CustomReadOnlyTransaction>(transaction_id, shared_from_this(), client_handle_);
+      return std::make_unique<CustomTransaction>(transaction_id, shared_from_this(), client_handle_);
     } catch (const std::exception& e) {
       XLOG(ERR) << "Failed to create readonly transaction: " << e.what();
       return nullptr;

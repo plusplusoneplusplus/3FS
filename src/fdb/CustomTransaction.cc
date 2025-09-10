@@ -46,15 +46,94 @@ CoTryTask<std::optional<String>> CustomReadOnlyTransaction::snapshotGet(std::str
 
   XLOG(DBG) << "Snapshot get key: " << key << " in transaction: " << transaction_id_;
   
-  // TODO: Implement actual call to Rust client
-  // This would involve:
-  // 1. Call the Rust KV server's snapshot_get method
-  // 2. Pass the transaction_id, key, and read_version
-  // 3. Handle the response and convert to 3FS types
-  // 4. Handle errors appropriately
+  // For snapshot reads on readonly transactions, we use a dedicated read transaction
+  // This provides snapshot isolation without the overhead of a full read-write transaction
+  if (!client_handle_) {
+    co_return makeError(StatusCode::kIOError, "Client handle not available");
+  }
   
-  // Placeholder implementation
-  co_return std::nullopt;
+  // Begin a read transaction with specific version if set
+  KvFutureHandle tx_future = kv_read_transaction_begin(client_handle_, read_version_.value_or(0));
+  
+  // Poll until ready
+  int ready = 0;
+  int retries = 0;
+  while (ready != 1 && retries < 100) {
+    ready = kv_future_poll(tx_future);
+    if (ready == -1) {
+      XLOG(ERR) << "Future polling failed for read transaction begin";
+      co_return makeError(StatusCode::kIOError, "Read transaction begin failed");
+    }
+    if (ready != 1) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      retries++;
+    }
+  }
+  
+  if (ready != 1) {
+    XLOG(ERR) << "Read transaction begin timed out";
+    co_return makeError(RPCCode::kTimeout, "Read transaction begin timed out");
+  }
+  
+  // Get the read transaction handle
+  KvReadTransactionHandle read_tx = kv_future_get_read_transaction(tx_future);
+  if (!read_tx) {
+    XLOG(ERR) << "Failed to get read transaction handle";
+    co_return makeError(StatusCode::kIOError, "Failed to get read transaction handle");
+  }
+  
+  // Call async get operation on read transaction
+  KvFutureHandle future = kv_read_transaction_get(read_tx, 
+                                                 reinterpret_cast<const uint8_t*>(key.data()),
+                                                 static_cast<int>(key.size()),
+                                                 nullptr);
+  
+  // Poll until ready
+  ready = 0;
+  retries = 0;
+  while (ready != 1 && retries < 100) {
+    ready = kv_future_poll(future);
+    if (ready == -1) {
+      XLOG(ERR) << "Future polling failed for snapshot get operation";
+      kv_read_transaction_destroy(read_tx);
+      co_return makeError(StatusCode::kIOError, "Future polling failed");
+    }
+    if (ready != 1) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      retries++;
+    }
+  }
+  
+  if (ready != 1) {
+    XLOG(ERR) << "Snapshot get operation timed out";
+    kv_read_transaction_destroy(read_tx);
+    co_return makeError(RPCCode::kTimeout, "Snapshot get operation timed out");
+  }
+  
+  // Get the result
+  KvBinaryData value;
+  KvResult result = kv_future_get_value_result(future, &value);
+  
+  if (result.success && value.data) {
+    std::string result_str;
+    result_str.assign(reinterpret_cast<const char*>(value.data), value.length);
+    kv_binary_free(&value);
+    
+    // Clean up read transaction
+    kv_read_transaction_destroy(read_tx);
+    
+    co_return result_str;
+  } else {
+    if (result.error_message) {
+      XLOG(DBG) << "Key not found or error in snapshot read: " << result.error_message;
+      kv_result_free(&result);
+    }
+    
+    // Clean up read transaction
+    kv_read_transaction_destroy(read_tx);
+    
+    co_return std::nullopt;
+  }
 }
 
 CoTryTask<std::optional<String>> CustomReadOnlyTransaction::get(std::string_view key) {
@@ -299,8 +378,94 @@ CoTryTask<std::optional<String>> CustomTransaction::snapshotGet(std::string_view
 
   XLOG(DBG) << "Snapshot get key: " << key << " in transaction: " << transaction_id_;
   
-  // TODO: Implement actual call to Rust client
-  co_return std::nullopt;
+  // For snapshot reads, we bypass local uncommitted writes and read directly from 
+  // the database at the transaction's read version using a read transaction
+  if (!client_handle_) {
+    co_return makeError(StatusCode::kIOError, "Client handle not available");
+  }
+  
+  // Begin a read transaction with specific version if set
+  KvFutureHandle tx_future = kv_read_transaction_begin(client_handle_, read_version_.value_or(0));
+  
+  // Poll until ready
+  int ready = 0;
+  int retries = 0;
+  while (ready != 1 && retries < 100) {
+    ready = kv_future_poll(tx_future);
+    if (ready == -1) {
+      XLOG(ERR) << "Future polling failed for read transaction begin";
+      co_return makeError(StatusCode::kIOError, "Read transaction begin failed");
+    }
+    if (ready != 1) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      retries++;
+    }
+  }
+  
+  if (ready != 1) {
+    XLOG(ERR) << "Read transaction begin timed out";
+    co_return makeError(RPCCode::kTimeout, "Read transaction begin timed out");
+  }
+  
+  // Get the read transaction handle
+  KvReadTransactionHandle read_tx = kv_future_get_read_transaction(tx_future);
+  if (!read_tx) {
+    XLOG(ERR) << "Failed to get read transaction handle";
+    co_return makeError(StatusCode::kIOError, "Failed to get read transaction handle");
+  }
+  
+  // Call async get operation on read transaction
+  KvFutureHandle future = kv_read_transaction_get(read_tx, 
+                                                 reinterpret_cast<const uint8_t*>(key.data()),
+                                                 static_cast<int>(key.size()),
+                                                 nullptr);
+  
+  // Poll until ready
+  ready = 0;
+  retries = 0;
+  while (ready != 1 && retries < 100) {
+    ready = kv_future_poll(future);
+    if (ready == -1) {
+      XLOG(ERR) << "Future polling failed for snapshot get operation";
+      kv_read_transaction_destroy(read_tx);
+      co_return makeError(StatusCode::kIOError, "Future polling failed");
+    }
+    if (ready != 1) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      retries++;
+    }
+  }
+  
+  if (ready != 1) {
+    XLOG(ERR) << "Snapshot get operation timed out";
+    kv_read_transaction_destroy(read_tx);
+    co_return makeError(RPCCode::kTimeout, "Snapshot get operation timed out");
+  }
+  
+  // Get the result
+  KvBinaryData value;
+  KvResult result = kv_future_get_value_result(future, &value);
+  
+  if (result.success && value.data) {
+    std::string result_str;
+    result_str.assign(reinterpret_cast<const char*>(value.data), value.length);
+    kv_binary_free(&value);
+    
+    // Clean up read transaction
+    kv_read_transaction_destroy(read_tx);
+    
+    co_return result_str;
+  } else {
+    if (result.error_message) {
+      XLOG(DBG) << "Key not found or error in snapshot read: " << result.error_message;
+      kv_result_free(&result);
+    }
+    
+    // Clean up read transaction
+    kv_read_transaction_destroy(read_tx);
+    
+    co_return std::nullopt;
+  }
 }
 
 CoTryTask<std::optional<String>> CustomTransaction::get(std::string_view key) {

@@ -39,21 +39,45 @@ TEST_F(TestCustomKvTransaction, SetValue) {
 TEST_F(TestCustomKvTransaction, SnapshotGet) {
   failIfNoKvServer();
   
+  const std::string snapKey = "snapshot_test_key";
+  const std::string snapValue = "snapshot_test_value";
+  
   folly::coro::blockingWait([&]() -> CoTask<void> {
-    auto transaction = engine_->createReadonlyTransaction();
-    if (transaction == nullptr) {
-      EXPECT_NE(transaction, nullptr) << "Transaction should not be null";
-      co_return;
+    // First, set up the data with a read-write transaction
+    {
+      auto writeTransaction = engine_->createReadWriteTransaction();
+      if (writeTransaction == nullptr) {
+        EXPECT_NE(writeTransaction, nullptr) << "Write transaction should not be null";
+        co_return;
+      }
+      
+      auto setResult = co_await writeTransaction->set(snapKey, snapValue);
+      EXPECT_TRUE(setResult.hasValue()) << "Failed to set up test data";
+      
+      auto commitResult = co_await writeTransaction->commit();
+      EXPECT_TRUE(commitResult.hasValue()) << "Failed to commit test data";
     }
     
-    auto result = co_await transaction->snapshotGet(testKey);
-    EXPECT_TRUE(result.hasValue());
-    if (result.hasValue() && result.value().has_value()) {
-      EXPECT_EQ(result.value().value(), testValue);
+    // Now test snapshotGet with a readonly transaction
+    {
+      auto readTransaction = engine_->createReadonlyTransaction();
+      if (readTransaction == nullptr) {
+        EXPECT_NE(readTransaction, nullptr) << "Read transaction should not be null";
+        co_return;
+      }
+      
+      auto result = co_await readTransaction->snapshotGet(snapKey);
+      EXPECT_TRUE(result.hasValue()) << "SnapshotGet should succeed";
+      
+      if (result.hasValue() && result.value().has_value()) {
+        EXPECT_EQ(result.value().value(), snapValue) << "SnapshotGet should return the committed value";
+      } else {
+        EXPECT_TRUE(false) << "SnapshotGet should have found the committed data";
+      }
+      
+      auto cancel = co_await readTransaction->cancel();
+      EXPECT_TRUE(cancel.hasValue());
     }
-    
-    auto cancel = co_await transaction->cancel();
-    EXPECT_TRUE(cancel.hasValue());
   }());
 }
 
