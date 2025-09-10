@@ -8,11 +8,11 @@
             "program": "${workspaceFolder}/build/bin/meta_main",
             "args": [
                 "--launcher_cfg",
-                "${workspaceFolder}/testing_configs/minimal_meta_launcher_config.toml",
+                "${workspaceFolder}/testing_configs/meta_main_launcher.toml",
                 "--app_cfg",
-                "${workspaceFolder}/testing_configs/minimal_meta_app_config.toml",
+                "${workspaceFolder}/testing_configs/meta_main_app.toml",
                 "--cfg",
-                "${workspaceFolder}/testing_configs/minimal_meta_server_config.toml"
+                "${workspaceFolder}/testing_configs/meta_main.toml"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
