@@ -126,8 +126,10 @@ CoTryTask<IReadOnlyTransaction::GetRangeResult> CustomReadOnlyTransaction::snaps
   std::string start_key(begin.key);
   std::string end_key(end.key);
   KvFutureHandle future = kv_read_transaction_get_range(read_tx, 
-                                                       start_key.c_str(), 
-                                                       end_key.c_str(), 
+                                                       reinterpret_cast<const uint8_t*>(start_key.data()),
+                                                       static_cast<int>(start_key.length()),
+                                                       reinterpret_cast<const uint8_t*>(end_key.data()), 
+                                                       static_cast<int>(end_key.length()),
                                                        limit, 
                                                        nullptr);
   
@@ -161,8 +163,12 @@ CoTryTask<IReadOnlyTransaction::GetRangeResult> CustomReadOnlyTransaction::snaps
   
   if (result.success) {
     for (size_t i = 0; i < pair_array.count; i++) {
-      kvs.emplace_back(std::string(pair_array.pairs[i].key), 
-                      std::string(pair_array.pairs[i].value));
+      std::string key_str(reinterpret_cast<const char*>(pair_array.pairs[i].key.data), 
+                         pair_array.pairs[i].key.length);
+      std::string value_str;
+      value_str.assign(reinterpret_cast<const char*>(pair_array.pairs[i].value.data), 
+                       pair_array.pairs[i].value.length);
+      kvs.emplace_back(std::move(key_str), std::move(value_str));
     }
     kv_pair_array_free(&pair_array);
     
@@ -311,8 +317,10 @@ CoTryTask<std::optional<String>> CustomTransaction::get(std::string_view key) {
   }
   
   // Call async get operation
-  std::string key_str(key);
-  KvFutureHandle future = kv_transaction_get((KvTransactionHandle)transaction_handle_, key_str.c_str(), nullptr);
+  KvFutureHandle future = kv_transaction_get((KvTransactionHandle)transaction_handle_, 
+                                            reinterpret_cast<const uint8_t*>(key.data()),
+                                            static_cast<int>(key.size()),
+                                            nullptr);
   
   // Poll until ready
   int ready = 0;
@@ -335,12 +343,13 @@ CoTryTask<std::optional<String>> CustomTransaction::get(std::string_view key) {
   }
   
   // Get the result
-  char* value = nullptr;
-  KvResult result = kv_future_get_string_result(future, &value);
+  KvBinaryData value;
+  KvResult result = kv_future_get_value_result(future, &value);
   
-  if (result.success && value) {
-    std::string result_str(value);
-    kv_string_free(value);
+  if (result.success && value.data) {
+    std::string result_str;
+    result_str.assign(reinterpret_cast<const char*>(value.data), value.length);
+    kv_binary_free(&value);
     co_return result_str;
   } else {
     if (result.error_message) {
@@ -381,8 +390,10 @@ CoTryTask<IReadOnlyTransaction::GetRangeResult> CustomTransaction::getRange(
   std::string start_key(begin.key);
   std::string end_key(end.key);
   KvFutureHandle future = kv_transaction_get_range((KvTransactionHandle)transaction_handle_, 
-                                                  start_key.c_str(), 
-                                                  end_key.c_str(), 
+                                                  reinterpret_cast<const uint8_t*>(start_key.data()),
+                                                  static_cast<int>(start_key.length()),
+                                                  reinterpret_cast<const uint8_t*>(end_key.data()),
+                                                  static_cast<int>(end_key.length()),
                                                   limit, 
                                                   nullptr);
   
@@ -414,8 +425,12 @@ CoTryTask<IReadOnlyTransaction::GetRangeResult> CustomTransaction::getRange(
   
   if (result.success) {
     for (size_t i = 0; i < pair_array.count; i++) {
-      kvs.emplace_back(std::string(pair_array.pairs[i].key), 
-                      std::string(pair_array.pairs[i].value));
+      std::string key_str(reinterpret_cast<const char*>(pair_array.pairs[i].key.data), 
+                         pair_array.pairs[i].key.length);
+      std::string value_str;
+      value_str.assign(reinterpret_cast<const char*>(pair_array.pairs[i].value.data), 
+                       pair_array.pairs[i].value.length);
+      kvs.emplace_back(std::move(key_str), std::move(value_str));
     }
     kv_pair_array_free(&pair_array);
     
@@ -519,9 +534,12 @@ CoTryTask<void> CustomTransaction::set(std::string_view key, std::string_view va
   }
   
   // Call async set operation
-  std::string key_str(key);
-  std::string value_str(value);
-  KvFutureHandle future = kv_transaction_set((KvTransactionHandle)transaction_handle_, key_str.c_str(), value_str.c_str(), nullptr);
+  KvFutureHandle future = kv_transaction_set((KvTransactionHandle)transaction_handle_, 
+                                            reinterpret_cast<const uint8_t*>(key.data()),
+                                            static_cast<int>(key.size()),
+                                            reinterpret_cast<const uint8_t*>(value.data()),
+                                            static_cast<int>(value.size()),
+                                            nullptr);
   
   // Poll until ready
   int ready = 0;
@@ -571,8 +589,10 @@ CoTryTask<void> CustomTransaction::clear(std::string_view key) {
   }
   
   // Call async delete operation
-  std::string key_str(key);
-  KvFutureHandle future = kv_transaction_delete((KvTransactionHandle)transaction_handle_, key_str.c_str(), nullptr);
+  KvFutureHandle future = kv_transaction_delete((KvTransactionHandle)transaction_handle_, 
+                                               reinterpret_cast<const uint8_t*>(key.data()),
+                                               static_cast<int>(key.size()),
+                                               nullptr);
   
   // Poll until ready
   int ready = 0;

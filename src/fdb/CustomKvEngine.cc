@@ -109,7 +109,10 @@ class CustomKvEngineImpl {
         }
         
         // Test connection with ping
-        KvFutureHandle ping_future = kv_client_ping(client_handle_, "hello");
+        const char* ping_msg = "hello";
+        KvFutureHandle ping_future = kv_client_ping(client_handle_, 
+                                                   reinterpret_cast<const uint8_t*>(ping_msg), 
+                                                   static_cast<int>(strlen(ping_msg)));
         if (ping_future) {
           // For now, don't wait for ping response in initialization
           // In production, you might want to wait for ping to complete
