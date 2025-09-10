@@ -30,9 +30,9 @@ class CustomKVTestBase : public ::testing::Test {
     engine_.reset();
   }
 
-  void skipIfUnhealthy() {
+  void failIfNoKvServer() {
     if (!engine_->isHealthy()) {
-      GTEST_SKIP() << "KV server not available at localhost:9090 - skipping integration test";
+      FAIL() << "KV server not available at localhost:9090 - test failed";
     }
   }
 

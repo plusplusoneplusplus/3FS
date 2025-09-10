@@ -16,7 +16,7 @@ namespace hf3fs::kv {
 class TestCustomKvTransaction : public CustomKVTestBase {};
 
 TEST_F(TestCustomKvTransaction, SetValue) {
-  skipIfUnhealthy();
+  failIfNoKvServer();
   
   folly::coro::blockingWait([&]() -> CoTask<void> {
     auto transaction = engine_->createReadWriteTransaction();
@@ -37,7 +37,7 @@ TEST_F(TestCustomKvTransaction, SetValue) {
 }
 
 TEST_F(TestCustomKvTransaction, SnapshotGet) {
-  skipIfUnhealthy();
+  failIfNoKvServer();
   
   folly::coro::blockingWait([&]() -> CoTask<void> {
     auto transaction = engine_->createReadonlyTransaction();
@@ -58,7 +58,7 @@ TEST_F(TestCustomKvTransaction, SnapshotGet) {
 }
 
 TEST_F(TestCustomKvTransaction, Get) {
-  skipIfUnhealthy();
+  failIfNoKvServer();
   
   folly::coro::blockingWait([&]() -> CoTask<void> {
     auto transaction = engine_->createReadWriteTransaction();
@@ -79,7 +79,7 @@ TEST_F(TestCustomKvTransaction, Get) {
 }
 
 TEST_F(TestCustomKvTransaction, Clear) {
-  skipIfUnhealthy();
+  failIfNoKvServer();
   
   folly::coro::blockingWait([&]() -> CoTask<void> {
     auto transaction = engine_->createReadWriteTransaction();
@@ -102,7 +102,7 @@ TEST_F(TestCustomKvTransaction, Clear) {
 }
 
 TEST_F(TestCustomKvTransaction, MultipleKeysTransaction) {
-  skipIfUnhealthy();
+  failIfNoKvServer();
   
   folly::coro::blockingWait([&]() -> CoTask<void> {
     auto transaction = engine_->createReadWriteTransaction();
@@ -138,7 +138,7 @@ TEST_F(TestCustomKvTransaction, MultipleKeysTransaction) {
 }
 
 TEST_F(TestCustomKvTransaction, ReadAfterCommit) {
-  skipIfUnhealthy();
+  failIfNoKvServer();
   
   const std::string key = "read_after_commit_key";
   const std::string value = "read_after_commit_value";
@@ -181,7 +181,7 @@ TEST_F(TestCustomKvTransaction, ReadAfterCommit) {
 }
 
 TEST_F(TestCustomKvTransaction, TransactionAbort) {
-  skipIfUnhealthy();
+  failIfNoKvServer();
   
   const std::string key = "abort_test_key";
   const std::string value = "abort_test_value";
@@ -225,7 +225,7 @@ TEST_F(TestCustomKvTransaction, TransactionAbort) {
 }
 
 TEST_F(TestCustomKvTransaction, SmallBinaryDataSetGet) {
-  skipIfUnhealthy();
+  failIfNoKvServer();
   
   folly::coro::blockingWait([&]() -> CoTask<void> {
     // Test simple ASCII string first to verify the connection works
@@ -339,7 +339,7 @@ TEST_F(TestCustomKvTransaction, SmallBinaryDataSetGet) {
 }
 
 TEST_F(TestCustomKvTransaction, LargeBinaryDataSetGet) {
-  skipIfUnhealthy();
+  failIfNoKvServer();
   
   folly::coro::blockingWait([&]() -> CoTask<void> {
     const uint32_t seed = 12345;  // Fixed seed for reproducible tests
@@ -418,7 +418,7 @@ TEST_F(TestCustomKvTransaction, LargeBinaryDataSetGet) {
 }
 
 TEST_F(TestCustomKvTransaction, BinaryDataWithNullBytes) {
-  skipIfUnhealthy();
+  failIfNoKvServer();
   
   folly::coro::blockingWait([&]() -> CoTask<void> {
     // Test data with embedded null bytes
@@ -476,7 +476,7 @@ TEST_F(TestCustomKvTransaction, BinaryDataWithNullBytes) {
 }
 
 TEST_F(TestCustomKvTransaction, LargeBinaryData) {
-  skipIfUnhealthy();
+  failIfNoKvServer();
   
   folly::coro::blockingWait([&]() -> CoTask<void> {
     std::random_device rd;
@@ -529,7 +529,7 @@ TEST_F(TestCustomKvTransaction, LargeBinaryData) {
 }
 
 TEST_F(TestCustomKvTransaction, BinaryKeyAndValue) {
-  skipIfUnhealthy();
+  failIfNoKvServer();
   
   folly::coro::blockingWait([&]() -> CoTask<void> {
     std::random_device rd;
