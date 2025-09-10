@@ -22,8 +22,15 @@ cmake --build build -j 32
 # Run all tests
 cd build && ctest
 
-# Run specific test binary
-./build/tests/[test_name]
+# Build and run specific test targets
+make test_common -j8                                    # Build common tests
+./tests/test_common                                     # Run all common tests
+./tests/test_common --gtest_filter="TestCustomKv*"     # Run filtered tests
+
+# Other test targets
+make test_meta -j8 && ./tests/test_meta                # Meta service tests
+make test_storage -j8 && ./tests/test_storage          # Storage service tests
+make test_client -j8 && ./tests/test_client            # Client tests
 ```
 
 ### Formatting and Linting
