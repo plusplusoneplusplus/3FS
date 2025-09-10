@@ -8,11 +8,11 @@
             "program": "${workspaceFolder}/build/bin/meta_main",
             "args": [
                 "--launcher_cfg",
-                "${workspaceFolder}/testing_configs/meta_main_launcher.toml",
+                "${workspaceFolder}/build/vscode_configs/meta_main_launcher.toml",
                 "--app_cfg",
-                "${workspaceFolder}/testing_configs/meta_main_app.toml",
+                "${workspaceFolder}/build/vscode_configs/meta_main_app.toml",
                 "--cfg",
-                "${workspaceFolder}/testing_configs/meta_main.toml"
+                "${workspaceFolder}/build/vscode_configs/meta_main.toml"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
@@ -29,9 +29,29 @@
                     "description": "Set Disassembly Flavor to Intel",
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
+                },
+                {
+                    "description": "Enable pretty printing format",
+                    "text": "-gdb-set print pretty on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable array printing",
+                    "text": "-gdb-set print array on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Show array indexes",
+                    "text": "-gdb-set print array-indexes on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set max elements to print",
+                    "text": "-gdb-set print elements 200",
+                    "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "build",
+            "preLaunchTask": "update-ip-configs",
             "miDebuggerPath": "/usr/bin/gdb",
             "logging": {
                 "moduleLoad": false,
@@ -48,11 +68,11 @@
             "program": "${workspaceFolder}/build/bin/mgmtd_main",
             "args": [
                 "--launcher_cfg",
-                "${workspaceFolder}/testing_configs/mgmtd_main_launcher.toml",
+                "${workspaceFolder}/build/vscode_configs/mgmtd_main_launcher.toml",
                 "--app-cfg",
-                "${workspaceFolder}/testing_configs/mgmtd_main_app.toml",
+                "${workspaceFolder}/build/vscode_configs/mgmtd_main_app.toml",
                 "--cfg",
-                "${workspaceFolder}/testing_configs/mgmtd_main.toml"
+                "${workspaceFolder}/build/vscode_configs/mgmtd_main.toml"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
@@ -69,9 +89,29 @@
                     "description": "Set Disassembly Flavor to Intel",
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
+                },
+                {
+                    "description": "Enable pretty printing format",
+                    "text": "-gdb-set print pretty on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable array printing",
+                    "text": "-gdb-set print array on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Show array indexes",
+                    "text": "-gdb-set print array-indexes on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set max elements to print",
+                    "text": "-gdb-set print elements 200",
+                    "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "build",
+            "preLaunchTask": "update-ip-configs",
             "miDebuggerPath": "/usr/bin/gdb",
             "logging": {
                 "moduleLoad": false,
@@ -88,7 +128,7 @@
             "program": "${workspaceFolder}/build/bin/admin_cli",
             "args": [
                 "--cfg",
-                "${workspaceFolder}/testing_configs/minimal_admin_cli.toml",
+                "${workspaceFolder}/build/vscode_configs/minimal_admin_cli.toml",
                 "\"create-target --node-id 10001 --disk-index 0 --target-id 101000100101 --chain-id 900100001 --use-new-chunk-engine\""
             ],
             "stopAtEntry": false,
@@ -106,9 +146,29 @@
                     "description": "Set Disassembly Flavor to Intel",
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
+                },
+                {
+                    "description": "Enable pretty printing format",
+                    "text": "-gdb-set print pretty on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable array printing",
+                    "text": "-gdb-set print array on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Show array indexes",
+                    "text": "-gdb-set print array-indexes on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set max elements to print",
+                    "text": "-gdb-set print elements 200",
+                    "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "build",
+            "preLaunchTask": "update-ip-configs",
             "miDebuggerPath": "/usr/bin/gdb",
             "logging": {
                 "moduleLoad": false,
@@ -125,11 +185,11 @@
             "program": "${workspaceFolder}/build/bin/hf3fs_fuse_main",
             "args": [
                 "--launcher_cfg",
-                "${workspaceFolder}/testing_configs/hf3fs_fuse_main_launcher.toml",
+                "${workspaceFolder}/build/vscode_configs/hf3fs_fuse_main_launcher.toml",
                 "--app_cfg",
-                "${workspaceFolder}/testing_configs/hf3fs_fuse_main_app.toml",
+                "${workspaceFolder}/build/vscode_configs/hf3fs_fuse_main_app.toml",
                 "--cfg",
-                "${workspaceFolder}/testing_configs/hf3fs_fuse_main.toml"
+                "${workspaceFolder}/build/vscode_configs/hf3fs_fuse_main.toml"
             ],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}/build",
@@ -146,9 +206,29 @@
                     "description": "Set Disassembly Flavor to Intel",
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
+                },
+                {
+                    "description": "Enable pretty printing format",
+                    "text": "-gdb-set print pretty on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable array printing",
+                    "text": "-gdb-set print array on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Show array indexes",
+                    "text": "-gdb-set print array-indexes on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set max elements to print",
+                    "text": "-gdb-set print elements 200",
+                    "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "build",
+            "preLaunchTask": "update-ip-configs",
             "miDebuggerPath": "/usr/bin/gdb",
             "logging": {
                 "moduleLoad": false,
@@ -175,6 +255,26 @@
                 {
                     "description": "Set Disassembly Flavor to Intel",
                     "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable pretty printing format",
+                    "text": "-gdb-set print pretty on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable array printing",
+                    "text": "-gdb-set print array on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Show array indexes",
+                    "text": "-gdb-set print array-indexes on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set max elements to print",
+                    "text": "-gdb-set print elements 200",
                     "ignoreFailures": true
                 }
             ],
@@ -204,6 +304,26 @@
                     "description": "Set Disassembly Flavor to Intel",
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
+                },
+                {
+                    "description": "Enable pretty printing format",
+                    "text": "-gdb-set print pretty on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable array printing",
+                    "text": "-gdb-set print array on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Show array indexes",
+                    "text": "-gdb-set print array-indexes on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set max elements to print",
+                    "text": "-gdb-set print elements 200",
+                    "ignoreFailures": true
                 }
             ],
             "logging": {
@@ -231,6 +351,26 @@
                 {
                     "description": "Set Disassembly Flavor to Intel",
                     "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable pretty printing format",
+                    "text": "-gdb-set print pretty on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable array printing",
+                    "text": "-gdb-set print array on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Show array indexes",
+                    "text": "-gdb-set print array-indexes on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set max elements to print",
+                    "text": "-gdb-set print elements 200",
                     "ignoreFailures": true
                 }
             ],
@@ -263,9 +403,29 @@
                     "description": "Set Disassembly Flavor to Intel",
                     "text": "-gdb-set disassembly-flavor intel",
                     "ignoreFailures": true
+                },
+                {
+                    "description": "Enable pretty printing format",
+                    "text": "-gdb-set print pretty on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable array printing",
+                    "text": "-gdb-set print array on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Show array indexes",
+                    "text": "-gdb-set print array-indexes on",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set max elements to print",
+                    "text": "-gdb-set print elements 200",
+                    "ignoreFailures": true
                 }
             ],
-            "preLaunchTask": "build",
+            "preLaunchTask": "update-ip-configs",
             "miDebuggerPath": "/usr/bin/gdb",
             "logging": {
                 "moduleLoad": false,
