@@ -8,4 +8,14 @@ allow_unknown_zone = true
 default_network_zone = 'TCP'
 
 [kv_engine]
-use_memkv = true
+kv_engine_type = "custom"
+use_memkv = false
+
+[kv_engine.custom_kv]
+cluster_endpoints = ["127.0.0.1:9090"]
+transaction_timeout_ms = 10000
+max_retry_count = 10
+connection_pool_size = 10
+connection_timeout_ms = 5000
+read_timeout_ms = 30000
+write_timeout_ms = 30000
