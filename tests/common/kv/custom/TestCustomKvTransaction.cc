@@ -608,4 +608,236 @@ TEST_F(TestCustomKvTransaction, BinaryKeyAndValue) {
   }());
 }
 
+TEST_F(TestCustomKvTransaction, SetVersionstampedKey) {
+  failIfNoKvServer();
+  
+  folly::coro::blockingWait([&]() -> CoTask<void> {
+    auto transaction = engine_->createReadWriteTransaction();
+    if (transaction == nullptr) {
+      EXPECT_NE(transaction, nullptr) << "Transaction should not be null";
+      co_return;
+    }
+    
+    // Test versionstamped key operation
+    std::string keyPrefix = "user_score_";
+    std::string value = "100";
+    
+    auto result = co_await transaction->setVersionstampedKey(keyPrefix, 0, value);
+    EXPECT_TRUE(result.hasValue()) << "SetVersionstampedKey should succeed";
+    
+    // Commit the transaction
+    auto commitResult = co_await transaction->commit();
+    EXPECT_TRUE(commitResult.hasValue()) << "Commit should succeed";
+    
+    // Note: In a full implementation, we would be able to retrieve the generated key
+    // from the commit result, but the current interface doesn't support this yet.
+    // The test verifies that the operation doesn't fail.
+  }());
+}
+
+TEST_F(TestCustomKvTransaction, SetVersionstampedValue) {
+  failIfNoKvServer();
+  
+  folly::coro::blockingWait([&]() -> CoTask<void> {
+    std::string key = "user_session";
+    std::string valuePrefix = "session_";
+    
+    // Set the versionstamped value
+    {
+      auto transaction = engine_->createReadWriteTransaction();
+      if (transaction == nullptr) {
+        EXPECT_NE(transaction, nullptr) << "Transaction should not be null";
+        co_return;
+      }
+      
+      auto result = co_await transaction->setVersionstampedValue(key, valuePrefix, 0);
+      EXPECT_TRUE(result.hasValue()) << "SetVersionstampedValue should succeed";
+      
+      // Commit the transaction
+      auto commitResult = co_await transaction->commit();
+      EXPECT_TRUE(commitResult.hasValue()) << "Commit should succeed";
+    }
+    
+    // Read back the value to verify the versionstamp was appended
+    {
+      auto readTransaction = engine_->createReadonlyTransaction();
+      if (readTransaction == nullptr) {
+        EXPECT_NE(readTransaction, nullptr) << "Read transaction should not be null";
+        co_return;
+      }
+      
+      auto getResult = co_await readTransaction->snapshotGet(key);
+      EXPECT_TRUE(getResult.hasValue()) << "Should be able to read the versionstamped value";
+      
+      if (getResult.hasValue() && getResult->has_value()) {
+        const std::string& actualValue = **getResult;
+        
+        // The value should start with our prefix
+        EXPECT_TRUE(actualValue.starts_with(valuePrefix)) 
+            << "Value should start with prefix '" << valuePrefix << "', got: '" << actualValue << "'";
+        
+        // The value should be longer than just the prefix (should have versionstamp appended)
+        EXPECT_GT(actualValue.size(), valuePrefix.size()) 
+            << "Value should be longer than prefix, indicating versionstamp was appended";
+        
+        // The versionstamp should be 10 bytes, so total length should be prefix + 10
+        EXPECT_EQ(actualValue.size(), valuePrefix.size() + 10) 
+            << "Value should be prefix + 10-byte versionstamp, got length: " << actualValue.size();
+        
+        XLOG(INFO) << "Successfully verified versionstamped value: prefix='" << valuePrefix 
+                   << "', total_length=" << actualValue.size() 
+                   << ", versionstamp_length=" << (actualValue.size() - valuePrefix.size());
+      } else {
+        EXPECT_TRUE(false) << "Should have found the versionstamped value";
+      }
+      
+      auto cancelResult = co_await readTransaction->cancel();
+      EXPECT_TRUE(cancelResult.hasValue());
+    }
+  }());
+}
+
+TEST_F(TestCustomKvTransaction, VersionstampedOperationsInSingleTransaction) {
+  failIfNoKvServer();
+  
+  folly::coro::blockingWait([&]() -> CoTask<void> {
+    std::string keyPrefix1 = "event_log_";
+    std::string value1 = "user_login";
+    std::string key2 = "last_activity";
+    std::string valuePrefix2 = "timestamp_";
+    std::string regularKey = "regular_key";
+    std::string regularValue = "regular_value";
+    
+    // Perform multiple versionstamped operations in single transaction
+    {
+      auto transaction = engine_->createReadWriteTransaction();
+      if (transaction == nullptr) {
+        EXPECT_NE(transaction, nullptr) << "Transaction should not be null";
+        co_return;
+      }
+      
+      auto result1 = co_await transaction->setVersionstampedKey(keyPrefix1, 0, value1);
+      EXPECT_TRUE(result1.hasValue()) << "First SetVersionstampedKey should succeed";
+      
+      auto result2 = co_await transaction->setVersionstampedValue(key2, valuePrefix2, 0);
+      EXPECT_TRUE(result2.hasValue()) << "SetVersionstampedValue should succeed";
+      
+      // Add a regular set operation as well
+      auto result3 = co_await transaction->set(regularKey, regularValue);
+      EXPECT_TRUE(result3.hasValue()) << "Regular set should succeed";
+      
+      // Commit all operations together
+      auto commitResult = co_await transaction->commit();
+      EXPECT_TRUE(commitResult.hasValue()) << "Commit should succeed";
+    }
+    
+    // Verify the regular key can be read back normally
+    {
+      auto readTransaction = engine_->createReadonlyTransaction();
+      if (readTransaction == nullptr) {
+        EXPECT_NE(readTransaction, nullptr) << "Read transaction should not be null";
+        co_return;
+      }
+      
+      auto getResult = co_await readTransaction->snapshotGet(regularKey);
+      EXPECT_TRUE(getResult.hasValue()) << "Should be able to read regular key";
+      
+      if (getResult.hasValue() && getResult->has_value()) {
+        EXPECT_EQ(**getResult, regularValue) << "Regular value should match exactly";
+      }
+      
+      // Verify the versionstamped value has the stamp appended
+      auto versionedResult = co_await readTransaction->snapshotGet(key2);
+      EXPECT_TRUE(versionedResult.hasValue()) << "Should be able to read versionstamped value";
+      
+      if (versionedResult.hasValue() && versionedResult->has_value()) {
+        const std::string& actualValue = **versionedResult;
+        EXPECT_TRUE(actualValue.starts_with(valuePrefix2)) 
+            << "Versionstamped value should start with prefix";
+        EXPECT_EQ(actualValue.size(), valuePrefix2.size() + 10) 
+            << "Versionstamped value should be prefix + 10-byte versionstamp";
+      }
+      
+      auto cancelResult = co_await readTransaction->cancel();
+      EXPECT_TRUE(cancelResult.hasValue());
+    }
+  }());
+}
+
+TEST_F(TestCustomKvTransaction, VersionstampedValueReadback) {
+  failIfNoKvServer();
+  
+  folly::coro::blockingWait([&]() -> CoTask<void> {
+    // Test that we can read back a versionstamped value and see the stamp
+    std::string testKey = "versionstamp_test";
+    std::string valuePrefix = "data_";
+    
+    // Write the versionstamped value
+    {
+      auto writeTransaction = engine_->createReadWriteTransaction();
+      if (writeTransaction == nullptr) {
+        EXPECT_NE(writeTransaction, nullptr) << "Write transaction should not be null";
+        co_return;
+      }
+      
+      auto setResult = co_await writeTransaction->setVersionstampedValue(testKey, valuePrefix, 0);
+      EXPECT_TRUE(setResult.hasValue()) << "SetVersionstampedValue should succeed";
+      
+      auto commitResult = co_await writeTransaction->commit();
+      EXPECT_TRUE(commitResult.hasValue()) << "Commit should succeed";
+    }
+    
+    // Read back and verify the versionstamped value
+    {
+      auto readTransaction = engine_->createReadonlyTransaction();
+      if (readTransaction == nullptr) {
+        EXPECT_NE(readTransaction, nullptr) << "Read transaction should not be null";
+        co_return;
+      }
+      
+      auto getResult = co_await readTransaction->snapshotGet(testKey);
+      EXPECT_TRUE(getResult.hasValue()) << "Should be able to read back the versionstamped value";
+      EXPECT_TRUE(getResult->has_value()) << "Key should exist";
+      
+      if (getResult.hasValue() && getResult->has_value()) {
+        const std::string& fullValue = **getResult;
+        
+        // Verify the structure of the versionstamped value
+        EXPECT_GE(fullValue.size(), valuePrefix.size() + 10) 
+            << "Value should be at least prefix + 10 bytes for versionstamp";
+        
+        // Extract the prefix part
+        std::string actualPrefix = fullValue.substr(0, valuePrefix.size());
+        EXPECT_EQ(actualPrefix, valuePrefix) << "Prefix should match exactly";
+        
+        // Extract the versionstamp (last 10 bytes)
+        if (fullValue.size() >= valuePrefix.size() + 10) {
+          std::string versionstamp = fullValue.substr(valuePrefix.size(), 10);
+          EXPECT_EQ(versionstamp.size(), 10) << "Versionstamp should be exactly 10 bytes";
+          
+          // Log the versionstamp bytes for inspection
+          std::string hex_stamp;
+          for (unsigned char byte : versionstamp) {
+            hex_stamp += fmt::format("{:02x} ", byte);
+          }
+          XLOG(INFO) << "Versionstamp hex: " << hex_stamp;
+          
+          // Versionstamp should not be all zeros (that would indicate it wasn't set)
+          bool all_zeros = std::all_of(versionstamp.begin(), versionstamp.end(), 
+                                      [](char c) { return c == '\0'; });
+          EXPECT_FALSE(all_zeros) << "Versionstamp should not be all zeros";
+          
+          XLOG(INFO) << "Successfully verified versionstamped value: " 
+                     << "prefix='" << valuePrefix << "', " 
+                     << "full_length=" << fullValue.size() << ", "
+                     << "versionstamp_length=" << versionstamp.size();
+        }
+      }
+      
+      auto cancelResult = co_await readTransaction->cancel();
+      EXPECT_TRUE(cancelResult.hasValue());
+    }
+  }());
+}
+
 }  // namespace hf3fs::kv

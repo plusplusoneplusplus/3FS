@@ -801,7 +801,29 @@ CoTryTask<void> CustomTransaction::setVersionstampedKey(std::string_view key, ui
   XLOG(DBG) << "Set versionstamped key: " << key << " offset: " << offset 
            << " in transaction: " << transaction_id_;
   
-  // TODO: Implement actual call to Rust client for versionstamped key
+  // Ensure we have a transaction handle
+  auto transaction_result = co_await ensureTransaction();
+  if (!transaction_result) {
+    co_return folly::makeUnexpected(transaction_result.error());
+  }
+  
+  // The key parameter represents the key prefix in versionstamped operations
+  // The offset parameter is ignored in this implementation as the Rust client
+  // handles versionstamp placement automatically at the end of the prefix
+  int result = kv_transaction_set_versionstamped_key(
+      (KvTransactionHandle)transaction_handle_,
+      reinterpret_cast<const uint8_t*>(key.data()),
+      static_cast<int>(key.size()),
+      reinterpret_cast<const uint8_t*>(value.data()),
+      static_cast<int>(value.size()),
+      nullptr  // no column family
+  );
+  
+  if (result != 1) {
+    XLOG(ERR) << "Set versionstamped key operation failed";
+    co_return makeError(StatusCode::kIOError, "Set versionstamped key operation failed");
+  }
+  
   co_return folly::unit;
 }
 
@@ -813,7 +835,29 @@ CoTryTask<void> CustomTransaction::setVersionstampedValue(std::string_view key, 
   XLOG(DBG) << "Set versionstamped value for key: " << key << " offset: " << offset 
            << " in transaction: " << transaction_id_;
   
-  // TODO: Implement actual call to Rust client for versionstamped value
+  // Ensure we have a transaction handle
+  auto transaction_result = co_await ensureTransaction();
+  if (!transaction_result) {
+    co_return folly::makeUnexpected(transaction_result.error());
+  }
+  
+  // The value parameter represents the value prefix in versionstamped operations
+  // The offset parameter is ignored in this implementation as the Rust client
+  // handles versionstamp placement automatically at the end of the prefix
+  int result = kv_transaction_set_versionstamped_value(
+      (KvTransactionHandle)transaction_handle_,
+      reinterpret_cast<const uint8_t*>(key.data()),
+      static_cast<int>(key.size()),
+      reinterpret_cast<const uint8_t*>(value.data()),
+      static_cast<int>(value.size()),
+      nullptr  // no column family
+  );
+  
+  if (result != 1) {
+    XLOG(ERR) << "Set versionstamped value operation failed";
+    co_return makeError(StatusCode::kIOError, "Set versionstamped value operation failed");
+  }
+  
   co_return folly::unit;
 }
 
