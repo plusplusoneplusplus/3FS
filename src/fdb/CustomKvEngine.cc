@@ -9,7 +9,7 @@
 #include "common/utils/Status.h"
 
 extern "C" {
-#include "third_party/kv/rust/client/include/kvstore_client.h"
+#include "third_party/kv/rust/src/client/kvstore_client.h"
 }
 
 namespace hf3fs::kv {
