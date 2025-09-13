@@ -209,6 +209,10 @@ CoTryTask<IReadOnlyTransaction::GetRangeResult> CustomReadOnlyTransaction::snaps
                                                        static_cast<int>(start_key.length()),
                                                        reinterpret_cast<const uint8_t*>(end_key.data()), 
                                                        static_cast<int>(end_key.length()),
+                                                       0,  // begin_offset (use 1 like FDB)
+                                                       begin.inclusive ? 0 : 1,  // begin_or_equal (!inclusive like FDB)
+                                                       0,  // end_offset (use 1 like FDB)
+                                                       end.inclusive ? 1 : 0,    // end_or_equal (inclusive like FDB)
                                                        limit, 
                                                        nullptr);
   
@@ -527,13 +531,8 @@ CoTryTask<std::optional<String>> CustomTransaction::get(std::string_view key) {
 
 CoTryTask<IReadOnlyTransaction::GetRangeResult> CustomTransaction::snapshotGetRange(
     const KeySelector& begin, const KeySelector& end, int32_t limit) {
-  if (cancelled_.load() || reset_.load() || committed_.load()) {
-    co_return makeError(StatusCode::kInvalidArg, "Transaction is finished");
-  }
-
-  // TODO: Implement actual call to Rust client
-  std::vector<KeyValue> kvs;
-  co_return GetRangeResult{std::move(kvs), false};
+  // For simplicity, just delegate to getRange
+  co_return co_await getRange(begin, end, limit);
 }
 
 CoTryTask<IReadOnlyTransaction::GetRangeResult> CustomTransaction::getRange(
@@ -559,6 +558,10 @@ CoTryTask<IReadOnlyTransaction::GetRangeResult> CustomTransaction::getRange(
                                                   static_cast<int>(start_key.length()),
                                                   reinterpret_cast<const uint8_t*>(end_key.data()),
                                                   static_cast<int>(end_key.length()),
+                                                  0,  // begin_offset
+                                                  begin.inclusive ? 0 : 1,  // begin_or_equal (!inclusive like FDB)
+                                                  0,  // end_offset
+                                                  end.inclusive ? 1 : 0,    // end_or_equal (inclusive like FDB)
                                                   limit, 
                                                   nullptr);
   
@@ -600,7 +603,7 @@ CoTryTask<IReadOnlyTransaction::GetRangeResult> CustomTransaction::getRange(
     kv_pair_array_free(&pair_array);
     
     // Check if we have more results (simplified: if we got exactly the limit, assume more)
-    bool has_more = pair_array.count == static_cast<size_t>(limit);
+    bool has_more = pair_array.count != 0 && pair_array.count == static_cast<size_t>(limit);
     
     co_return GetRangeResult{std::move(kvs), has_more};
   } else {
@@ -810,6 +813,19 @@ CoTryTask<void> CustomTransaction::setVersionstampedKey(std::string_view key, ui
   // The key parameter represents the key prefix in versionstamped operations
   // The offset parameter is ignored in this implementation as the Rust client
   // handles versionstamp placement automatically at the end of the prefix
+  
+  // Validate inputs before calling the Rust client
+  if (key.empty()) {
+    XLOG(ERR) << "SetVersionstampedKey: key prefix cannot be empty";
+    co_return makeError(StatusCode::kInvalidArg, "SetVersionstampedKey: key prefix cannot be empty");
+  }
+  
+  // Log the operation details for debugging
+  XLOG(DBG) << "Calling kv_transaction_set_versionstamped_key with:" 
+           << " key_prefix='" << key << "' (" << key.size() << " bytes)" 
+           << " value='" << value << "' (" << value.size() << " bytes)" 
+           << " transaction_handle=" << transaction_handle_;
+  
   int result = kv_transaction_set_versionstamped_key(
       (KvTransactionHandle)transaction_handle_,
       reinterpret_cast<const uint8_t*>(key.data()),
@@ -819,9 +835,15 @@ CoTryTask<void> CustomTransaction::setVersionstampedKey(std::string_view key, ui
       nullptr  // no column family
   );
   
-  if (result != 1) {
-    XLOG(ERR) << "Set versionstamped key operation failed";
-    co_return makeError(StatusCode::kIOError, "Set versionstamped key operation failed");
+  XLOG(DBG) << "kv_transaction_set_versionstamped_key returned: " << result;
+  
+  if (result != KV_FUNCTION_SUCCESS) {
+    XLOG(ERR) << "Set versionstamped key operation failed: key_prefix='" << key 
+             << "', value='" << value << "', result=" << result
+             << ", transaction_handle=" << transaction_handle_;
+    co_return makeError(StatusCode::kIOError, fmt::format(
+        "Set versionstamped key operation failed: result={}, key_prefix='{}', value='{}'", 
+        result, key, value));
   }
   
   co_return folly::unit;
@@ -844,6 +866,19 @@ CoTryTask<void> CustomTransaction::setVersionstampedValue(std::string_view key, 
   // The value parameter represents the value prefix in versionstamped operations
   // The offset parameter is ignored in this implementation as the Rust client
   // handles versionstamp placement automatically at the end of the prefix
+  
+  // Validate inputs before calling the Rust client
+  if (key.empty()) {
+    XLOG(ERR) << "SetVersionstampedValue: key cannot be empty";
+    co_return makeError(StatusCode::kInvalidArg, "SetVersionstampedValue: key cannot be empty");
+  }
+  
+  // Log the operation details for debugging
+  XLOG(DBG) << "Calling kv_transaction_set_versionstamped_value with:" 
+           << " key='" << key << "' (" << key.size() << " bytes)" 
+           << " value_prefix='" << value << "' (" << value.size() << " bytes)" 
+           << " transaction_handle=" << transaction_handle_;
+  
   int result = kv_transaction_set_versionstamped_value(
       (KvTransactionHandle)transaction_handle_,
       reinterpret_cast<const uint8_t*>(key.data()),
@@ -853,9 +888,15 @@ CoTryTask<void> CustomTransaction::setVersionstampedValue(std::string_view key, 
       nullptr  // no column family
   );
   
-  if (result != 1) {
-    XLOG(ERR) << "Set versionstamped value operation failed";
-    co_return makeError(StatusCode::kIOError, "Set versionstamped value operation failed");
+  XLOG(DBG) << "kv_transaction_set_versionstamped_value returned: " << result;
+  
+  if (result != KV_FUNCTION_SUCCESS) {
+    XLOG(ERR) << "Set versionstamped value operation failed: key='" << key 
+             << "', value_prefix='" << value << "', result=" << result
+             << ", transaction_handle=" << transaction_handle_;
+    co_return makeError(StatusCode::kIOError, fmt::format(
+        "Set versionstamped value operation failed: result={}, key='{}', value_prefix='{}'", 
+        result, key, value));
   }
   
   co_return folly::unit;
