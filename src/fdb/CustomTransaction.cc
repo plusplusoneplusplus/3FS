@@ -866,25 +866,32 @@ CoTryTask<void> CustomTransaction::setVersionstampedValue(std::string_view key, 
   // The value parameter represents the value prefix in versionstamped operations
   // The offset parameter is ignored in this implementation as the Rust client
   // handles versionstamp placement automatically at the end of the prefix
-  
+
   // Validate inputs before calling the Rust client
   if (key.empty()) {
     XLOG(ERR) << "SetVersionstampedValue: key cannot be empty";
     co_return makeError(StatusCode::kInvalidArg, "SetVersionstampedValue: key cannot be empty");
   }
-  
+
+  // Create a buffer with the prefix + space for 10-byte versionstamp
+  // The Rust implementation expects a buffer where the last 10 bytes will be overwritten
+  // with the versionstamp, so we need prefix + 10 additional bytes
+  std::string value_buffer = std::string(value);
+  value_buffer.resize(value.size() + 10, '\0');
+
   // Log the operation details for debugging
-  XLOG(DBG) << "Calling kv_transaction_set_versionstamped_value with:" 
-           << " key='" << key << "' (" << key.size() << " bytes)" 
-           << " value_prefix='" << value << "' (" << value.size() << " bytes)" 
+  XLOG(DBG) << "Calling kv_transaction_set_versionstamped_value with:"
+           << " key='" << key << "' (" << key.size() << " bytes)"
+           << " value_prefix='" << value << "' (" << value.size() << " bytes)"
+           << " value_buffer='" << value_buffer << "' (" << value_buffer.size() << " bytes)"
            << " transaction_handle=" << transaction_handle_;
-  
+
   int result = kv_transaction_set_versionstamped_value(
       (KvTransactionHandle)transaction_handle_,
       reinterpret_cast<const uint8_t*>(key.data()),
       static_cast<int>(key.size()),
-      reinterpret_cast<const uint8_t*>(value.data()),
-      static_cast<int>(value.size()),
+      reinterpret_cast<const uint8_t*>(value_buffer.data()),
+      static_cast<int>(value_buffer.size()),
       nullptr  // no column family
   );
   
