@@ -1,7 +1,10 @@
 #include "CustomTransaction.h"
 
+#include <memory>
 #include <folly/logging/xlog.h>
 #include <fmt/format.h>
+#include <folly/experimental/coro/Coroutine.h>
+#include <folly/experimental/coro/Baton.h>
 
 #include "common/utils/Status.h"
 #include "common/utils/Result.h"
@@ -11,6 +14,33 @@ extern "C" {
 }
 
 namespace hf3fs::kv {
+
+// Helper function to wait for a future to be ready using callbacks with polling fallback
+static folly::coro::Task<void> waitForFuture(KvFutureHandle future) {
+  // Check if already ready first
+  int ready = kv_future_poll(future);
+  if (ready == 1) {
+    co_return;
+  }
+  if (ready == -1) {
+    throw std::runtime_error("Future polling failed");
+  }
+
+  // Use baton for async notification if not immediately ready
+  auto baton = std::make_unique<folly::coro::Baton>();
+  auto* baton_ptr = baton.get();
+
+  // Set callback for async notification
+  kv_future_set_callback(future,
+    [](KvFutureHandle, void* user_context) {
+      auto* b = static_cast<folly::coro::Baton*>(user_context);
+      b->post();
+    },
+    baton_ptr);
+
+  // Wait for the callback to be invoked
+  co_await *baton;
+}
 
 // CustomReadOnlyTransaction implementation
 CustomReadOnlyTransaction::CustomReadOnlyTransaction(const std::string& transaction_id,
@@ -54,26 +84,9 @@ CoTryTask<std::optional<String>> CustomReadOnlyTransaction::snapshotGet(std::str
   
   // Begin a read transaction with specific version if set
   KvFutureHandle tx_future = kv_read_transaction_begin(client_handle_, read_version_.value_or(0));
-  
-  // Poll until ready
-  int ready = 0;
-  int retries = 0;
-  while (ready != 1 && retries < 100) {
-    ready = kv_future_poll(tx_future);
-    if (ready == -1) {
-      XLOG(ERR) << "Future polling failed for read transaction begin";
-      co_return makeError(StatusCode::kIOError, "Read transaction begin failed");
-    }
-    if (ready != 1) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      retries++;
-    }
-  }
-  
-  if (ready != 1) {
-    XLOG(ERR) << "Read transaction begin timed out";
-    co_return makeError(RPCCode::kTimeout, "Read transaction begin timed out");
-  }
+
+  // Wait for future to be ready using pure callback
+  co_await waitForFuture(tx_future);
   
   // Get the read transaction handle
   KvReadTransactionHandle read_tx = kv_future_get_read_transaction(tx_future);
@@ -83,32 +96,13 @@ CoTryTask<std::optional<String>> CustomReadOnlyTransaction::snapshotGet(std::str
   }
   
   // Call async get operation on read transaction
-  KvFutureHandle future = kv_read_transaction_get(read_tx, 
+  KvFutureHandle future = kv_read_transaction_get(read_tx,
                                                  reinterpret_cast<const uint8_t*>(key.data()),
                                                  static_cast<int>(key.size()),
                                                  nullptr);
-  
-  // Poll until ready
-  ready = 0;
-  retries = 0;
-  while (ready != 1 && retries < 100) {
-    ready = kv_future_poll(future);
-    if (ready == -1) {
-      XLOG(ERR) << "Future polling failed for snapshot get operation";
-      kv_read_transaction_destroy(read_tx);
-      co_return makeError(StatusCode::kIOError, "Future polling failed");
-    }
-    if (ready != 1) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      retries++;
-    }
-  }
-  
-  if (ready != 1) {
-    XLOG(ERR) << "Snapshot get operation timed out";
-    kv_read_transaction_destroy(read_tx);
-    co_return makeError(RPCCode::kTimeout, "Snapshot get operation timed out");
-  }
+
+  // Wait for future to be ready using pure callback
+  co_await waitForFuture(future);
   
   // Get the result
   KvBinaryData value;
@@ -173,26 +167,9 @@ CoTryTask<IReadOnlyTransaction::GetRangeResult> CustomReadOnlyTransaction::snaps
   
   // Begin a read transaction with specific version if set
   KvFutureHandle tx_future = kv_read_transaction_begin(client_handle_, read_version_.value_or(0));
-  
-  // Poll until ready
-  int ready = 0;
-  int retries = 0;
-  while (ready != 1 && retries < 100) {
-    ready = kv_future_poll(tx_future);
-    if (ready == -1) {
-      XLOG(ERR) << "Future polling failed for read transaction begin";
-      co_return makeError(StatusCode::kIOError, "Read transaction begin failed");
-    }
-    if (ready != 1) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      retries++;
-    }
-  }
-  
-  if (ready != 1) {
-    XLOG(ERR) << "Read transaction begin timed out";
-    co_return makeError(RPCCode::kTimeout, "Read transaction begin timed out");
-  }
+
+  // Wait for future to be ready using pure callback
+  co_await waitForFuture(tx_future);
   
   // Get the read transaction handle
   KvReadTransactionHandle read_tx = kv_future_get_read_transaction(tx_future);
@@ -204,39 +181,20 @@ CoTryTask<IReadOnlyTransaction::GetRangeResult> CustomReadOnlyTransaction::snaps
   // Call async get_range operation on read transaction
   std::string start_key(begin.key);
   std::string end_key(end.key);
-  KvFutureHandle future = kv_read_transaction_get_range(read_tx, 
+  KvFutureHandle future = kv_read_transaction_get_range(read_tx,
                                                        reinterpret_cast<const uint8_t*>(start_key.data()),
                                                        static_cast<int>(start_key.length()),
-                                                       reinterpret_cast<const uint8_t*>(end_key.data()), 
+                                                       reinterpret_cast<const uint8_t*>(end_key.data()),
                                                        static_cast<int>(end_key.length()),
-                                                       0,  // begin_offset (use 1 like FDB)
-                                                       begin.inclusive ? 0 : 1,  // begin_or_equal (!inclusive like FDB)
-                                                       0,  // end_offset (use 1 like FDB)
-                                                       end.inclusive ? 1 : 0,    // end_or_equal (inclusive like FDB)
-                                                       limit, 
+                                                       0,  // begin_offset
+                                                       begin.inclusive ? 0 : 1,  // begin_or_equal
+                                                       0,  // end_offset
+                                                       end.inclusive ? 1 : 0,    // end_or_equal
+                                                       limit,
                                                        nullptr);
-  
-  // Poll until ready
-  ready = 0;
-  retries = 0;
-  while (ready != 1 && retries < 100) {
-    ready = kv_future_poll(future);
-    if (ready == -1) {
-      XLOG(ERR) << "Future polling failed for snapshot get_range operation";
-      kv_read_transaction_destroy(read_tx);
-      co_return makeError(StatusCode::kIOError, "Future polling failed");
-    }
-    if (ready != 1) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      retries++;
-    }
-  }
-  
-  if (ready != 1) {
-    XLOG(ERR) << "Snapshot get range operation timed out";
-    kv_read_transaction_destroy(read_tx);
-    co_return makeError(RPCCode::kTimeout, "Snapshot get range operation timed out");
-  }
+
+  // Wait for future to be ready using pure callback
+  co_await waitForFuture(future);
   
   // Get the result
   KvPairArray pair_array;
@@ -338,26 +296,9 @@ CoTryTask<folly::Unit> CustomTransaction::ensureTransaction() {
 
   // Begin a new transaction
   KvFutureHandle future = kv_transaction_begin(client_handle_, 30);  // 30 seconds timeout
-  
-  // Poll until ready
-  int ready = 0;
-  int retries = 0;
-  while (ready != 1 && retries < 100) {
-    ready = kv_future_poll(future);
-    if (ready == -1) {
-      XLOG(ERR) << "Future polling failed for transaction begin";
-      co_return makeError(StatusCode::kIOError, "Transaction begin failed");
-    }
-    if (ready != 1) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      retries++;
-    }
-  }
-  
-  if (ready != 1) {
-    XLOG(ERR) << "Transaction begin timed out";
-    co_return makeError(RPCCode::kTimeout, "Transaction begin timed out");
-  }
+
+  // Wait for future to be ready using pure callback
+  co_await waitForFuture(future);
   
   // Get the transaction handle
   transaction_handle_ = kv_future_get_transaction(future);
@@ -390,26 +331,9 @@ CoTryTask<std::optional<String>> CustomTransaction::snapshotGet(std::string_view
   
   // Begin a read transaction with specific version if set
   KvFutureHandle tx_future = kv_read_transaction_begin(client_handle_, read_version_.value_or(0));
-  
-  // Poll until ready
-  int ready = 0;
-  int retries = 0;
-  while (ready != 1 && retries < 100) {
-    ready = kv_future_poll(tx_future);
-    if (ready == -1) {
-      XLOG(ERR) << "Future polling failed for read transaction begin";
-      co_return makeError(StatusCode::kIOError, "Read transaction begin failed");
-    }
-    if (ready != 1) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      retries++;
-    }
-  }
-  
-  if (ready != 1) {
-    XLOG(ERR) << "Read transaction begin timed out";
-    co_return makeError(RPCCode::kTimeout, "Read transaction begin timed out");
-  }
+
+  // Wait for future to be ready using pure callback
+  co_await waitForFuture(tx_future);
   
   // Get the read transaction handle
   KvReadTransactionHandle read_tx = kv_future_get_read_transaction(tx_future);
@@ -419,32 +343,13 @@ CoTryTask<std::optional<String>> CustomTransaction::snapshotGet(std::string_view
   }
   
   // Call async get operation on read transaction
-  KvFutureHandle future = kv_read_transaction_get(read_tx, 
+  KvFutureHandle future = kv_read_transaction_get(read_tx,
                                                  reinterpret_cast<const uint8_t*>(key.data()),
                                                  static_cast<int>(key.size()),
                                                  nullptr);
-  
-  // Poll until ready
-  ready = 0;
-  retries = 0;
-  while (ready != 1 && retries < 100) {
-    ready = kv_future_poll(future);
-    if (ready == -1) {
-      XLOG(ERR) << "Future polling failed for snapshot get operation";
-      kv_read_transaction_destroy(read_tx);
-      co_return makeError(StatusCode::kIOError, "Future polling failed");
-    }
-    if (ready != 1) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      retries++;
-    }
-  }
-  
-  if (ready != 1) {
-    XLOG(ERR) << "Snapshot get operation timed out";
-    kv_read_transaction_destroy(read_tx);
-    co_return makeError(RPCCode::kTimeout, "Snapshot get operation timed out");
-  }
+
+  // Wait for future to be ready using pure callback
+  co_await waitForFuture(future);
   
   // Get the result
   KvBinaryData value;
@@ -486,30 +391,13 @@ CoTryTask<std::optional<String>> CustomTransaction::get(std::string_view key) {
   }
   
   // Call async get operation
-  KvFutureHandle future = kv_transaction_get((KvTransactionHandle)transaction_handle_, 
+  KvFutureHandle future = kv_transaction_get((KvTransactionHandle)transaction_handle_,
                                             reinterpret_cast<const uint8_t*>(key.data()),
                                             static_cast<int>(key.size()),
                                             nullptr);
-  
-  // Poll until ready
-  int ready = 0;
-  int retries = 0;
-  while (ready != 1 && retries < 100) {
-    ready = kv_future_poll(future);
-    if (ready == -1) {
-      XLOG(ERR) << "Future polling failed for get operation";
-      co_return makeError(StatusCode::kIOError, "Future polling failed");
-    }
-    if (ready != 1) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      retries++;
-    }
-  }
-  
-  if (ready != 1) {
-    XLOG(ERR) << "Get operation timed out";
-    co_return makeError(RPCCode::kTimeout, "Get operation timed out");
-  }
+
+  // Wait for future to be ready using pure callback
+  co_await waitForFuture(future);
   
   // Get the result
   KvBinaryData value;
@@ -553,7 +441,7 @@ CoTryTask<IReadOnlyTransaction::GetRangeResult> CustomTransaction::getRange(
   // Call async get_range operation
   std::string start_key(begin.key);
   std::string end_key(end.key);
-  KvFutureHandle future = kv_transaction_get_range((KvTransactionHandle)transaction_handle_, 
+  KvFutureHandle future = kv_transaction_get_range((KvTransactionHandle)transaction_handle_,
                                                   reinterpret_cast<const uint8_t*>(start_key.data()),
                                                   static_cast<int>(start_key.length()),
                                                   reinterpret_cast<const uint8_t*>(end_key.data()),
@@ -562,28 +450,11 @@ CoTryTask<IReadOnlyTransaction::GetRangeResult> CustomTransaction::getRange(
                                                   begin.inclusive ? 0 : 1,  // begin_or_equal (!inclusive like FDB)
                                                   0,  // end_offset
                                                   end.inclusive ? 1 : 0,    // end_or_equal (inclusive like FDB)
-                                                  limit, 
+                                                  limit,
                                                   nullptr);
-  
-  // Poll until ready
-  int ready = 0;
-  int retries = 0;
-  while (ready != 1 && retries < 100) {
-    ready = kv_future_poll(future);
-    if (ready == -1) {
-      XLOG(ERR) << "Future polling failed for get_range operation";
-      co_return makeError(StatusCode::kIOError, "Future polling failed");
-    }
-    if (ready != 1) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      retries++;
-    }
-  }
-  
-  if (ready != 1) {
-    XLOG(ERR) << "Get range operation timed out";
-    co_return makeError(RPCCode::kTimeout, "Get range operation timed out");
-  }
+
+  // Wait for future to be ready using pure callback
+  co_await waitForFuture(future);
   
   // Get the result
   KvPairArray pair_array;
@@ -622,32 +493,22 @@ CoTryTask<void> CustomTransaction::cancel() {
     // If we have a transaction handle, abort it
     if (transaction_handle_) {
       KvFutureHandle future = kv_transaction_abort((KvTransactionHandle)transaction_handle_);
-      
-      // Poll until ready (simple blocking approach)
-      int ready = 0;
-      int retries = 0;
-      while (ready != 1 && retries < 50) {  // Shorter timeout for abort
-        ready = kv_future_poll(future);
-        if (ready == -1) {
-          XLOG(WARN) << "Future polling failed for abort operation, continuing anyway";
-          break;
-        }
-        if (ready != 1) {
-          std::this_thread::sleep_for(std::chrono::milliseconds(50));
-          retries++;
-        }
-      }
-      
-      if (ready == 1) {
+
+      try {
+        // Wait for future to be ready using pure callback
+        co_await waitForFuture(future);
+
         // Get the void result to clean up
         KvResult result = kv_future_get_void_result(future);
         if (!result.success) {
-          XLOG(WARN) << "Transaction abort returned error: " 
+          XLOG(WARN) << "Transaction abort returned error: "
                      << (result.error_message ? result.error_message : "Unknown error");
         }
         kv_result_free(&result);
+      } catch (...) {
+        XLOG(WARN) << "Transaction abort callback failed, continuing anyway";
       }
-      
+
       transaction_handle_ = nullptr;
     }
   }
@@ -702,32 +563,15 @@ CoTryTask<void> CustomTransaction::set(std::string_view key, std::string_view va
   }
   
   // Call async set operation
-  KvFutureHandle future = kv_transaction_set((KvTransactionHandle)transaction_handle_, 
+  KvFutureHandle future = kv_transaction_set((KvTransactionHandle)transaction_handle_,
                                             reinterpret_cast<const uint8_t*>(key.data()),
                                             static_cast<int>(key.size()),
                                             reinterpret_cast<const uint8_t*>(value.data()),
                                             static_cast<int>(value.size()),
                                             nullptr);
-  
-  // Poll until ready
-  int ready = 0;
-  int retries = 0;
-  while (ready != 1 && retries < 100) {
-    ready = kv_future_poll(future);
-    if (ready == -1) {
-      XLOG(ERR) << "Future polling failed for set operation";
-      co_return makeError(StatusCode::kIOError, "Future polling failed");
-    }
-    if (ready != 1) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      retries++;
-    }
-  }
-  
-  if (ready != 1) {
-    XLOG(ERR) << "Set operation timed out";
-    co_return makeError(RPCCode::kTimeout, "Set operation timed out");
-  }
+
+  // Wait for future to be ready using pure callback
+  co_await waitForFuture(future);
   
   // Get the result
   KvResult result = kv_future_get_void_result(future);
@@ -757,30 +601,13 @@ CoTryTask<void> CustomTransaction::clear(std::string_view key) {
   }
   
   // Call async delete operation
-  KvFutureHandle future = kv_transaction_delete((KvTransactionHandle)transaction_handle_, 
+  KvFutureHandle future = kv_transaction_delete((KvTransactionHandle)transaction_handle_,
                                                reinterpret_cast<const uint8_t*>(key.data()),
                                                static_cast<int>(key.size()),
                                                nullptr);
-  
-  // Poll until ready
-  int ready = 0;
-  int retries = 0;
-  while (ready != 1 && retries < 100) {
-    ready = kv_future_poll(future);
-    if (ready == -1) {
-      XLOG(ERR) << "Future polling failed for delete operation";
-      co_return makeError(StatusCode::kIOError, "Future polling failed");
-    }
-    if (ready != 1) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      retries++;
-    }
-  }
-  
-  if (ready != 1) {
-    XLOG(ERR) << "Delete operation timed out";
-    co_return makeError(RPCCode::kTimeout, "Delete operation timed out");
-  }
+
+  // Wait for future to be ready using pure callback
+  co_await waitForFuture(future);
   
   // Get the result
   KvResult result = kv_future_get_void_result(future);
@@ -930,26 +757,9 @@ CoTryTask<void> CustomTransaction::commit() {
   
   // Call async commit operation
   KvFutureHandle future = kv_transaction_commit((KvTransactionHandle)transaction_handle_);
-  
-  // Poll until ready (simple blocking approach)
-  int ready = 0;
-  int retries = 0;
-  while (ready != 1 && retries < 100) {
-    ready = kv_future_poll(future);
-    if (ready == -1) {
-      XLOG(ERR) << "Future polling failed for commit operation";
-      co_return makeError(StatusCode::kIOError, "Future polling failed");
-    }
-    if (ready != 1) {
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
-      retries++;
-    }
-  }
-  
-  if (ready != 1) {
-    XLOG(ERR) << "Commit operation timed out after " << retries << " retries";
-    co_return makeError(RPCCode::kTimeout, "Commit operation timed out");
-  }
+
+  // Wait for future to be ready using pure callback
+  co_await waitForFuture(future);
   
   // Get the void result
   KvResult result = kv_future_get_void_result(future);
